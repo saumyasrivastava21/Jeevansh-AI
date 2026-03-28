@@ -26,7 +26,7 @@ export const mockReports: MedicalReport[] = [
   {
     id: 'r1', patientId: 'u1', patientName: 'Arjun Mehta',
     disease: 'pneumonia', diseaseName: 'Pneumonia',
-    imageUrl: 'https://picsum.photos/seed/xray1/600/500',
+    imageUrl: '/images/diseases/pneumonia.png',
     confidence: 91.4, severity: 'high', status: 'completed',
     aiFindings: 'AI analysis detected significant consolidation in the right lower lobe consistent with bacterial pneumonia. Increased opacity observed with air bronchograms. No pleural effusion noted.',
     recommendation: 'Immediate antibiotic therapy recommended. Follow-up chest X-ray in 4–6 weeks. Monitor oxygen saturation closely.',
@@ -37,7 +37,7 @@ export const mockReports: MedicalReport[] = [
   {
     id: 'r2', patientId: 'u1', patientName: 'Arjun Mehta',
     disease: 'bone-fracture', diseaseName: 'Bone Fracture',
-    imageUrl: 'https://picsum.photos/seed/xray2/600/500',
+    imageUrl: '/images/diseases/bone-fracture.png',
     confidence: 87.2, severity: 'medium', status: 'reviewed',
     aiFindings: 'Hairline fracture detected in the distal radius. Mildly displaced fracture with no significant angulation. Soft tissue swelling present around the fracture site.',
     recommendation: 'Casting for 6 weeks. Calcium and Vitamin D supplementation. Orthopedic follow-up in 2 weeks.',
@@ -48,7 +48,7 @@ export const mockReports: MedicalReport[] = [
   {
     id: 'r3', patientId: 'u2', patientName: 'Priya Sharma',
     disease: 'brain-tumor', diseaseName: 'Brain Tumor',
-    imageUrl: 'https://picsum.photos/seed/mri1/600/500',
+    imageUrl: '/images/diseases/brain-tumor.png',
     confidence: 78.9, severity: 'high', status: 'processing',
     aiFindings: 'AI model has detected a suspicious hyperdense lesion in the right frontal lobe. Further MRI with contrast is recommended for definitive diagnosis.',
     recommendation: 'Urgent MRI with contrast. Neurosurgery consultation required. Monitor for neurological symptoms.',
@@ -58,7 +58,7 @@ export const mockReports: MedicalReport[] = [
   {
     id: 'r4', patientId: 'u3', patientName: 'Ravi Kumar',
     disease: 'tuberculosis', diseaseName: 'Tuberculosis',
-    imageUrl: 'https://picsum.photos/seed/xray3/600/500',
+    imageUrl: '/images/diseases/tuberculosis.png',
     confidence: 94.1, severity: 'high', status: 'completed',
     aiFindings: 'Bilateral upper lobe infiltrates with cavitation noted. Findings strongly suggestive of active pulmonary tuberculosis. Hilar lymphadenopathy visible.',
     recommendation: 'Start DOTS therapy immediately. Sputum AFB smear. Isolate patient. Notify public health authorities.',
@@ -69,7 +69,7 @@ export const mockReports: MedicalReport[] = [
   {
     id: 'r5', patientId: 'u1', patientName: 'Arjun Mehta',
     disease: 'lung-cancer', diseaseName: 'Lung Cancer',
-    imageUrl: 'https://picsum.photos/seed/xray4/600/500',
+    imageUrl: '/images/diseases/lung-cancer.png',
     confidence: 65.3, severity: 'medium', status: 'pending',
     aiFindings: 'A 1.2cm pulmonary nodule detected in the right upper lobe. Spiculated margins noted. Low-to-moderate probability of malignancy based on AI analysis.',
     recommendation: 'CT chest with contrast for nodule characterization. PET scan if malignancy suspected. Thoracic oncology consultation.',

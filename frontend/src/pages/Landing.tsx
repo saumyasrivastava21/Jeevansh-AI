@@ -76,7 +76,7 @@ export default function Landing() {
         {/* Background image */}
         <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: 'url(https://picsum.photos/seed/hospital-hero/1920/1080)' }}
+          style={{ backgroundImage: 'url(/images/hospital_hero.png)' }}
         />
         <div className="absolute inset-0 hero-overlay" />
 

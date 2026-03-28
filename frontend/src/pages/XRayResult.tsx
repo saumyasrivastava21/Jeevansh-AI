@@ -108,7 +108,7 @@ export default function XRayResult() {
               }`}
             >
               <img
-                src={report.imageUrl || "https://picsum.photos/seed/xray/600"}
+                src={report.imageUrl || "/images/diseases/pneumonia.png"}
                 alt="Medical scan"
                 className="w-full h-full object-cover"
                 style={{

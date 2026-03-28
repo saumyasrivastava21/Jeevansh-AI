@@ -86,7 +86,7 @@ export default function Tutorial() {
       <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
         <Card className="medical-card overflow-hidden">
           <div className="h-64 bg-medical-blue relative flex items-center justify-center">
-            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url(https://picsum.photos/seed/tutorial/800/400)', backgroundSize: 'cover' }} />
+            <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'url(/images/tutorial_hero.png)', backgroundSize: 'cover' }} />
             <div className="relative z-10 text-center">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3 border-4 border-white/40">
                 <Play className="w-7 h-7 text-white ml-1" />

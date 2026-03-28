@@ -359,7 +359,7 @@ export default function UserDashboard() {
                         <Link to="/result" state={{ report }}>
                           <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group">
                             <img
-                              src={report.imageUrl || "https://picsum.photos/seed/xray/200"}
+                              src={report.imageUrl || "/images/diseases/pneumonia.png"}
                               alt=""
                               className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-black"
                             />
