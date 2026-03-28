@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { apiFetch } from '@/lib/api';
 
 export type UserRole = 'patient' | 'doctor' | 'admin';
 
 export interface AuthUser {
-  id: string;
+  id: string; // _id from mongo
   name: string;
   email: string;
   role: UserRole;
@@ -30,54 +31,94 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const STORAGE_KEY = 'jeevansh_auth_user';
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? (JSON.parse(stored) as AuthUser) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Load user profile on mount
   useEffect(() => {
-    if (user) localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-    else localStorage.removeItem(STORAGE_KEY);
-  }, [user]);
-
-  const login = useCallback(async (email: string, _password: string, role: UserRole) => {
-    setIsLoading(true);
-    await new Promise(r => setTimeout(r, 1200));
-    const displayName = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-    const newUser: AuthUser = {
-      id: `user_${Date.now()}`,
-      name: displayName,
-      email,
-      role,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=0B3C5D&color=fff&size=128&bold=true`,
+    const fetchUser = async () => {
+      const token = localStorage.getItem('jeevansh_token');
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+      try {
+        const response = await apiFetch('/users/profile');
+        if (response.success && response.data) {
+          const userData = response.data;
+          setUser({
+            id: userData._id,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role,
+            avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name)}&background=0B3C5D&color=fff&size=128&bold=true`
+          });
+        } else {
+          localStorage.removeItem('jeevansh_token');
+        }
+      } catch (err) {
+        console.error('Failed to load profile:', err);
+        localStorage.removeItem('jeevansh_token');
+      } finally {
+        setIsLoading(false);
+      }
     };
-    setUser(newUser);
-    setIsLoading(false);
+    fetchUser();
+  }, []);
+
+  const login = useCallback(async (email: string, password: string, role: UserRole) => {
+    setIsLoading(true);
+    try {
+      const response = await apiFetch('/users/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, role })
+      });
+      if (response.success && response.data) {
+        localStorage.setItem('jeevansh_token', response.data.token);
+        setUser({
+          id: response.data._id,
+          name: response.data.name,
+          email: response.data.email,
+          role: response.data.role,
+          avatar: response.data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(response.data.name)}&background=0B3C5D&color=fff&size=128&bold=true`
+        });
+      }
+    } catch (error) {
+      console.error('Login error', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const register = useCallback(async (data: RegisterData) => {
     setIsLoading(true);
-    await new Promise(r => setTimeout(r, 1500));
-    const newUser: AuthUser = {
-      id: `user_${Date.now()}`,
-      name: data.name,
-      email: data.email,
-      role: data.role,
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=0B3C5D&color=fff&size=128&bold=true`,
-    };
-    setUser(newUser);
-    setIsLoading(false);
+    try {
+      const response = await apiFetch('/users/create', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+      if (response.success && response.data) {
+        localStorage.setItem('jeevansh_token', response.data.token);
+        setUser({
+          id: response.data._id,
+          name: response.data.name,
+          email: response.data.email,
+          role: response.data.role,
+          avatar: response.data.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(response.data.name)}&background=0B3C5D&color=fff&size=128&bold=true`
+        });
+      }
+    } catch (error) {
+      console.error('Register error', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   const logout = useCallback(() => {
+    localStorage.removeItem('jeevansh_token');
     setUser(null);
   }, []);
 
