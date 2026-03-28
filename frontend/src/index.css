@@ -1,0 +1,142 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 208 82% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 208 82% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 208 82% 12%;
+    --primary: 208 82% 21%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 145 63% 49%;
+    --secondary-foreground: 208 82% 12%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 198 100% 50%;
+    --accent-foreground: 208 82% 12%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 208 82% 21%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 198 100% 50%;
+    --primary-foreground: 222 47% 7%;
+    --secondary: 145 63% 40%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222 47% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 198 100% 50%;
+    --accent-foreground: 222 47% 7%;
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 47% 20%;
+    --input: 222 47% 20%;
+    --ring: 198 100% 50%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "cv02","cv03","cv04","cv11";
+  }
+  h1,h2,h3,h4,h5,h6 { @apply tracking-tight; }
+}
+
+@layer utilities {
+  /* Glassmorphism */
+  .glass {
+    @apply bg-white/10 backdrop-blur-xl border border-white/20;
+  }
+  .glass-card {
+    @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-xl;
+  }
+  .glass-dark {
+    @apply bg-black/30 backdrop-blur-xl border border-white/10;
+  }
+
+  /* Medical gradient text */
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #0B3C5D 0%, #00D1FF 100%);
+  }
+  .dark .gradient-text {
+    background-image: linear-gradient(135deg, #00D1FF 0%, #2ECC71 100%);
+  }
+
+  /* Hero overlay */
+  .hero-overlay {
+    background: linear-gradient(
+      160deg,
+      rgba(11,60,93,0.97) 0%,
+      rgba(11,60,93,0.85) 50%,
+      rgba(0,209,255,0.25) 100%
+    );
+  }
+
+  /* Sidebar gradient */
+  .sidebar-gradient {
+    background: linear-gradient(180deg, #0B3C5D 0%, #072A42 100%);
+  }
+
+  /* Cyan glow effect */
+  .glow-cyan {
+    box-shadow: 0 0 30px rgba(0, 209, 255, 0.3), 0 0 60px rgba(0, 209, 255, 0.1);
+  }
+  .glow-green {
+    box-shadow: 0 0 30px rgba(46, 204, 113, 0.3);
+  }
+
+  /* Scrollbar hiding */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+
+  /* Skeleton shimmer */
+  .skeleton {
+    @apply relative overflow-hidden bg-muted rounded-md;
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 1.5s infinite;
+  }
+  .dark .skeleton::after {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+  }
+
+  /* Medical card hover */
+  .medical-card {
+    @apply bg-white dark:bg-gray-900 rounded-2xl border border-border shadow-sm
+           transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-medical-cyan/40;
+  }
+
+  /* Status badges */
+  .badge-success { @apply bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400; }
+  .badge-warning { @apply bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400; }
+  .badge-danger  { @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
+  .badge-info    { @apply bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400; }
+  .badge-neutral { @apply bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300; }
+}
