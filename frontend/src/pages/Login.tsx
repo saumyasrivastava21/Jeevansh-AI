@@ -30,8 +30,8 @@ export default function Login() {
     try {
       await login(email, password, role);
       navigate('/dashboard');
-    } catch {
-      setError('Invalid credentials. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Invalid credentials. Please try again.');
     }
   };
 
