@@ -2,6 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
 
 // Routes
 const userRoutes = require("./routes/userRoutes");
@@ -19,6 +20,9 @@ const app = express();
 // Middleware config
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+// Serve local static uploaded scans
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
 // Database connection
 const connectDB = async () => {

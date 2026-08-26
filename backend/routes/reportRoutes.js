@@ -6,6 +6,7 @@ const {
   updateReportStatus,
 } = require("../controllers/reportController");
 const { protect, authorize } = require("../middlewares/authMiddleware");
+const upload = require("../middlewares/uploadMiddleware");
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ router.post(
   "/",
   protect,
   authorize("patient", "doctor", "admin"),
+  upload.single("image"),
   createReport
 );
 router.get("/myreports", protect, authorize("patient"), getPatientReports);

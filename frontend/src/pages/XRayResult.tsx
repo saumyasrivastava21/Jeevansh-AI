@@ -61,6 +61,19 @@ export default function XRayResult() {
     severityConfig.medium;
   const SevIcon = sev.icon;
 
+  const getScanImageSrc = () => {
+    if (heatmap && report.heatmapImage) {
+      return `data:image/jpeg;base64,${report.heatmapImage}`;
+    }
+    if (!report.imageUrl) {
+      return "/images/diseases/pneumonia.png";
+    }
+    if (report.imageUrl.startsWith("http") || report.imageUrl.startsWith("blob:")) {
+      return report.imageUrl;
+    }
+    return `http://localhost:5000${report.imageUrl}`;
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -90,7 +103,7 @@ export default function XRayResult() {
                 onClick={() => setHeatmap(!heatmap)}
                 className="text-xs"
               >
-                {heatmap ? "Original" : "Heatmap"}
+                {heatmap ? "Original" : (report.taskType === "detection" ? "Attention Overlay" : "Grad-CAM Heatmap")}
               </Button>
               <Button
                 variant="outline"
@@ -108,59 +121,79 @@ export default function XRayResult() {
               }`}
             >
               <img
-                src={report.imageUrl || "/images/diseases/pneumonia.png"}
+                src={getScanImageSrc()}
                 alt="Medical scan"
                 className="w-full h-full object-cover"
                 style={{
                   filter: heatmap
-                    ? "hue-rotate(120deg) saturate(2)"
+                    ? (report.heatmapImage ? "none" : "hue-rotate(120deg) saturate(2)")
                     : "grayscale(0.3)",
                 }}
               />
-              {/* Heatmap overlay */}
-              {heatmap && report.bboxCoords && (
+              {/* Heatmap overlay (Attention Overlay for YOLO, Grad-CAM for Classification) */}
+              {heatmap && (report.taskType === "detection" ? (
+                // Draw attention circles centered on each detection
                 <div className="absolute inset-0 mix-blend-color-dodge">
-                  <div
-                    className="absolute rounded-full opacity-60 blur-2xl bg-red-500"
-                    style={{
-                      left: `${report.bboxCoords.x}%`,
-                      top: `${report.bboxCoords.y}%`,
-                      width: `${report.bboxCoords.w}%`,
-                      height: `${report.bboxCoords.h}%`,
-                    }}
-                  />
-                </div>
-              )}
-              {/* Bounding box */}
-              {report.bboxCoords && (
-                <div
-                  className="absolute border-2 border-medical-cyan rounded"
-                  style={{
-                    left: `${report.bboxCoords.x}%`,
-                    top: `${report.bboxCoords.y}%`,
-                    width: `${report.bboxCoords.w}%`,
-                    height: `${report.bboxCoords.h}%`,
-                    boxShadow:
-                      "0 0 0 1px rgba(0,209,255,0.3), inset 0 0 0 1px rgba(0,209,255,0.1)",
-                  }}
-                >
-                  <span className="absolute -top-6 left-0 bg-medical-cyan text-medical-blue text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
-                    {report.diseaseName} — {report.confidence}%
-                  </span>
-                  {/* Corner marks */}
-                  {[
-                    "-top-1 -left-1",
-                    "-top-1 -right-1",
-                    "-bottom-1 -left-1",
-                    "-bottom-1 -right-1",
-                  ].map((pos) => (
-                    <span
-                      key={pos}
-                      className={`absolute ${pos} w-3 h-3 border-2 border-medical-cyan bg-medical-cyan/20 rounded-sm`}
+                  {(report.detections && report.detections.length > 0 ? report.detections : (report.bboxCoords ? [{ bbox: report.bboxCoords }] : [])).map((d: any, idx: number) => (
+                    <div
+                      key={`heatmap-${idx}`}
+                      className="absolute rounded-full opacity-60 blur-2xl bg-red-500"
+                      style={{
+                        left: `${d.bbox.x}%`,
+                        top: `${d.bbox.y}%`,
+                        width: `${d.bbox.w}%`,
+                        height: `${d.bbox.h}%`,
+                      }}
                     />
                   ))}
                 </div>
-              )}
+              ) : (
+                report.heatmapImage && (
+                  <div className="absolute inset-0">
+                    {/* Heatmap base64 is already set as image src */}
+                  </div>
+                )
+              ))}
+              
+              {/* Bounding boxes (multiple detections support) */}
+              {(report.taskType === "detection" || report.bboxCoords) && 
+                (report.detections && report.detections.length > 0 ? report.detections : (report.bboxCoords ? [{ label: report.diseaseName, confidence: report.confidence, bbox: report.bboxCoords }] : [])).map((d: any, idx: number) => {
+                  const bbox = d.bbox;
+                  if (!bbox) return null;
+                  const labelVal = d.label || d.class || report.diseaseName;
+                  const confVal = d.confidence ? (d.confidence <= 1 ? Math.round(d.confidence * 100) : d.confidence) : report.confidence;
+                  return (
+                    <div
+                      key={`bbox-${idx}`}
+                      className="absolute border-2 border-medical-cyan rounded"
+                      style={{
+                        left: `${bbox.x}%`,
+                        top: `${bbox.y}%`,
+                        width: `${bbox.w}%`,
+                        height: `${bbox.h}%`,
+                        boxShadow:
+                          "0 0 0 1px rgba(0,209,255,0.3), inset 0 0 0 1px rgba(0,209,255,0.1)",
+                      }}
+                    >
+                      <span className="absolute -top-6 left-0 bg-medical-cyan text-medical-blue text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
+                        {labelVal.replace(/_/g, " ")} — {confVal}%
+                      </span>
+                      {/* Corner marks */}
+                      {[
+                        "-top-1 -left-1",
+                        "-top-1 -right-1",
+                        "-bottom-1 -left-1",
+                        "-bottom-1 -right-1",
+                      ].map((pos) => (
+                        <span
+                          key={pos}
+                          className={`absolute ${pos} w-3 h-3 border-2 border-medical-cyan bg-medical-cyan/20 rounded-sm`}
+                        />
+                      ))}
+                    </div>
+                  );
+                })
+              }
             </div>
           </CardContent>
         </Card>
@@ -188,7 +221,7 @@ export default function XRayResult() {
                     {sev.label}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {report.diseaseName} detected
+                    {report.hasFinding ? `${report.diseaseName} detected` : `No ${report.diseaseName.toLowerCase()} detected`}
                   </p>
                 </div>
               </CardContent>
@@ -196,35 +229,55 @@ export default function XRayResult() {
           </motion.div>
 
           {/* Confidence */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-          >
-            <Card className="medical-card">
-              <CardContent className="p-5 space-y-3">
-                <div className="flex justify-between items-center">
+          {report.confidence !== null && report.confidence !== undefined ? (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Card className="medical-card">
+                <CardContent className="p-5 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-semibold">AI Confidence Score</p>
+                    <span className="text-2xl font-black text-primary">
+                      {report.confidence}%
+                    </span>
+                  </div>
+                  <Progress
+                    value={report.confidence}
+                    indicatorClassName={sev.prog}
+                    className="h-4"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>0% — No findings</span>
+                    <span>100% — High confidence</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Inference Model: <span className="font-semibold text-foreground">{report.aiModel || "Jeevansh AI Classifier"} {report.aiModelVersion ? `(v${report.aiModelVersion})` : ""}</span>
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Card className="medical-card bg-muted/20 border border-border">
+                <CardContent className="p-5 space-y-2">
                   <p className="text-sm font-semibold">AI Confidence Score</p>
-                  <span className="text-2xl font-black text-primary">
-                    {report.confidence}%
-                  </span>
-                </div>
-                <Progress
-                  value={report.confidence}
-                  indicatorClassName={sev.prog}
-                  className="h-4"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>0% — No findings</span>
-                  <span>100% — High confidence</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Individual model scores: ResNet-50: ${(report.confidence - 2.1).toFixed(1)}% ·
-                  EfficientNet: ${(report.confidence + 1.2).toFixed(1)}% · DenseNet: ${report.confidence.toFixed(1)}%
-                </p>
-              </CardContent>
-            </Card>
-          </motion.div>
+                  <p className="text-sm font-black text-primary">N/A</p>
+                  <p className="text-xs text-muted-foreground">
+                    No {report.diseaseName.toLowerCase()} detected above the configured detection threshold (0.25).
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Inference Model: <span className="font-semibold text-foreground">{report.aiModel || "Jeevansh AI Detector"} {report.aiModelVersion ? `(v${report.aiModelVersion})` : ""}</span>
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
 
           {/* Status */}
           <motion.div
@@ -292,6 +345,74 @@ export default function XRayResult() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dynamic Class Probabilities or YOLO Detections */}
+      {report.taskType === "classification" && report.probabilities && Object.keys(report.probabilities).length > 0 && (
+        <Card className="medical-card mt-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Info className="w-4 h-4 text-primary" /> Class Probabilities
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(Object.entries(report.probabilities) as [string, number][])
+              .sort((a, b) => b[1] - a[1]) // Sort probabilities descending
+              .map(([cls, prob]) => {
+                const percentageValue = prob <= 1 ? prob * 100 : prob;
+                return (
+                  <div key={cls} className="space-y-1">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="capitalize">{cls.replace(/_/g, " ")}</span>
+                      <span>{percentageValue.toFixed(2)}%</span>
+                    </div>
+                    <Progress value={percentageValue} className="h-1.5" />
+                  </div>
+                );
+              })}
+          </CardContent>
+        </Card>
+      )}
+
+      {report.taskType === "detection" && report.detections && report.detections.length > 0 && (
+        <Card className="medical-card mt-6">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Info className="w-4 h-4 text-primary" /> Detected Findings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {report.detections.map((d: any, idx: number) => {
+              const percentageValue = d.confidence <= 1 ? d.confidence * 100 : d.confidence;
+              return (
+                <div key={idx} className="flex justify-between items-center p-3 rounded-lg bg-muted/50 border border-border">
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold capitalize">{(d.label || d.class || "").replace(/_/g, " ")}</p>
+                    {d.bbox && (
+                      <p className="text-xs text-muted-foreground">Location: X: {Math.round(d.bbox.x)}%, Y: {Math.round(d.bbox.y)}%</p>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="border-medical-cyan text-medical-cyan font-bold">
+                    {percentageValue.toFixed(2)}% Confidence
+                  </Badge>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Medical Safety Disclaimer */}
+      <Card className="border-red-200/40 bg-red-500/5 mt-6">
+        <CardContent className="p-4 flex items-start gap-4">
+          <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <h4 className="text-sm font-semibold text-red-700 dark:text-red-400">Clinical Review Required</h4>
+            <p className="text-xs text-red-600/90 dark:text-red-400/80 leading-relaxed">
+              <strong>Disclaimer:</strong> Jeevansh AI predictions are decision-support outputs and are <strong>NOT</strong> a confirmed medical diagnosis. These AI results are for decision support and do not replace evaluation by a qualified healthcare professional.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

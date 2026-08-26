@@ -126,21 +126,17 @@ export default function UserDashboard() {
     if (!file || !disease) return;
     setUploading(true);
     try {
-      await new Promise((r) => setTimeout(r, 1000));
-      // Post to true backend route
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("disease", disease);
+      formData.append(
+        "diseaseName",
+        diseases.find((d) => d.value === disease)?.label || disease
+      );
+
       const res = await apiFetch("/reports", {
         method: "POST",
-        body: JSON.stringify({
-          disease,
-          diseaseName:
-            diseases.find((d) => d.value === disease)?.label || disease,
-          imageUrl: URL.createObjectURL(file), // Note: using local Object URL for demo since real upload takes s3/cloud
-          confidence: Math.floor(Math.random() * 20) + 80, // 80-99
-          severity: "high", // example mock logic
-          aiFindings: "AI has detected anomalies consistent with the selected disease parameters. Consultation recommended.",
-          recommendation: "Please schedule an appointment with a specialist.",
-          bboxCoords: { x: 40, y: 40, w: 20, h: 20 },
-        }),
+        body: formData,
       });
 
       if (res.success) {
