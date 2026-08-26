@@ -2,225 +2,116 @@
 
 ### Multimodal Disease Detection & AI-Powered Medical Imaging Assistant
 
----
+Jeevansh AI is a next-generation AI-powered healthcare platform that combines **Computer Vision + Generative AI** to assist in medical diagnosis and patient understanding. 
 
-## 🚀 Overview
-
-**Jeevansh AI** is a next-generation AI-powered healthcare platform that combines **Computer Vision + Generative AI (RAG)** to assist in medical diagnosis and patient understanding.
-
-It enables users to upload medical images (X-rays, scans, etc.), detect diseases using deep learning models, and receive **AI-generated medical reports with conversational support**.
-
-> Built to bridge the gap between medical expertise and accessibility, especially in resource-constrained environments.
+The application has a fully working model-driven architecture integrating a React frontend, Node.js + Express backend, MongoDB database, and a Python FastAPI AI inference service running 4 actual medical deep learning checkpoints.
 
 ---
 
-## 🎯 Key Features
+## 🏗️ Technical Architecture
 
-### 🧪 Multimodal Disease Detection
-
-* Supports multiple medical imaging domains:
-
-  * Brain Tumor Detection
-  * Pneumonia Detection
-  * Bone Fracture Detection
-  * Dental Caries Detection
-  * Diabetic Retinopathy
-  * Skin Cancer Detection
-  * Tuberculosis & Lung Diseases
-
----
-
-### 🔍 AI-Powered Analysis
-
-* Disease classification + severity estimation
-* Visual interpretability:
-
-  * Bounding boxes
-  * Heatmaps (Grad-CAM style UI)
-* Confidence scoring
-
----
-
-### 🤖 RAG-Based Medical Chatbot
-
-* Retrieval-Augmented Generation (RAG)
-* Generates:
-
-  * Detailed diagnostic reports
-  * Treatment suggestions
-  * Follow-up Q&A
-* Interactive conversational interface
-
----
-
-### 👨‍⚕️ Multi-Role System
-
-* **User (Patient)** → Upload scans & view reports
-* **Doctor** → Analyze cases & add notes
-* **Admin** → Monitor system & manage users
-
----
-
-### 📊 Smart Dashboard
-
-* Scan history
-* AI-generated reports
-* Activity tracking
-* SaaS-style analytics UI
-
----
-
-### 🌍 Healthcare Ecosystem Features
-
-* Find doctors & consultation UI
-* Disease knowledge base
-* Tutorials for platform usage
-* Community discussion forum
-
----
-
-## 🏗️ Tech Stack
-
-### 💻 Frontend
-
-* React (Vite)
-* TypeScript
-* Tailwind CSS
-* ShadCN UI
-* Framer Motion
-* Recharts
-
-### 🧠 AI / ML (Planned / Integrated)
-
-* CNN-based models (DenseNet, MobileNet, etc.)
-* Grad-CAM for explainability
-* RAG pipeline with LLM integration
-
----
-
-## 📂 Project Structure
-
-```
-src/
- ├── components/      # Reusable UI components
- ├── pages/           # All routes/pages
- ├── layouts/         # Layout wrappers
- ├── hooks/           # Custom hooks
- ├── data/            # Mock data
- ├── utils/           # Helper functions
- ├── assets/          # Images & icons
+```text
+React UI (Vite)
+       ↓
+Express Backend (:5000)
+       ↓
+FastAPI AI Service (:8000)
+       ↓
+Actual PyTorch / YOLO Checkpoint
+       ↓
+Real-time Prediction & Attention Overlays
+       ↓
+Express Persistence
+       ↓
+MongoDB (:27017)
+       ↓
+React Results Page (with Bounding Boxes & Heatmaps)
 ```
 
 ---
 
-## 🖼️ Core Modules
+## 🎯 Verified Medical AI Models
 
-### 1. Landing Page
+Jeevansh AI runs 4 medical imaging models in memory with direct-vs-debug pipeline tracking:
 
-* AI healthcare introduction
-* Animated UI
-* Feature highlights
+1. **Skin Cancer Classifier**
+   * **Task**: Multiclass Classification (7 skin lesion classes including Melanoma, BCC, etc.)
+   * **Architecture**: `MobileNetV3-Large`
+   * **Explainability**: Grad-CAM (visualizing final convolutional layer `features[16][0]`)
+   * **Preprocessing**: Strict ImageNet normalization + channel alignment.
 
-### 2. Dashboard
+2. **Pneumonia Classifier**
+   * **Task**: Binary Classification (`NORMAL` vs `PNEUMONIA`)
+   * **Architecture**: `MobileNetV3-Large`
+   * **Explainability**: Grad-CAM (visualizing final convolutional layer `features[16][0]`)
+   * **Preprocessing**: Channel-aligned inputs.
 
-* Upload X-ray
-* View reports
-* Activity history
+3. **Brain Tumor Detector**
+   * **Task**: Object Detection (`brain_tumor`)
+   * **Architecture**: `YOLOv9m`
+   * **Explainability**: Detection Attention Overlay
+   * **Inference Parameters**: `imgsz=640`, `conf=0.25`, `iou=0.45`
 
-### 3. X-ray Analysis
-
-* Image preview
-* Bounding box visualization
-* Heatmap overlays
-* Confidence score
-
-### 4. AI Chatbot
-
-* ChatGPT-style interface
-* Medical Q&A
-* Auto-generated reports
-
-### 5. Doctor Portal
-
-* Case analysis UI
-* Notes & recommendations
-
-### 6. Admin Panel
-
-* User management
-* Analytics dashboard
+4. **Bone Fracture Detector**
+   * **Task**: Object Detection (`fracture`)
+   * **Architecture**: `YOLO11`
+   * **Explainability**: Detection Attention Overlay
+   * **Inference Parameters**: `imgsz=1024`, `conf=0.25`, `iou=0.45` (using OpenCV BGR channel alignment for maximum parity with direct model execution)
 
 ---
 
-## ⚙️ Setup Instructions
+## ⚙️ Setup and Local Running Instructions
 
+### Prerequisites
+- Python 3.10+
+- Node.js 18+
+- MongoDB local instance running on `localhost:27017`
+
+### 1. Run Python FastAPI AI Service
 ```bash
-# Clone repository
-git clone https://github.com/your-username/jeevansh-ai
-
-# Navigate to project
-cd jeevansh-ai
-
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
+cd ai-service
+pip install -r requirements.txt
+uvicorn app.main:app --port 8000 --host 127.0.0.1
 ```
+*Verify API health*: `http://127.0.0.1:8000/health`  
+*Verify loaded models*: `http://127.0.0.1:8000/models`
+
+### 2. Run Express Backend
+```bash
+cd backend
+npm install
+npm start
+```
+Runs on `http://localhost:5000` and connects to local MongoDB.
+
+### 3. Run React Frontend (Vite)
+```bash
+cd frontend
+npm install
+npm run dev -- --host
+```
+Runs on `http://localhost:5173`. Login with seeded credentials:
+- **Email**: `arjun@example.com`
+- **Password**: `demo123`
 
 ---
 
-## 🎨 UI/UX Highlights
+## 🧪 Testing and Validation Scripts
 
-* Medical-grade design system
-* Dark mode support
-* Smooth animations (Framer Motion)
-* Responsive across all devices
-* Clean SaaS-style dashboard
+The repository contains automated scripts under `ai-service/tests` to verify pipeline accuracy:
 
----
-
-## 🔮 Future Scope
-
-* Real-time model inference
-* Backend integration (Node.js / FastAPI)
-* Cloud deployment (AWS / GCP)
-* Doctor consultation system
-* Mobile app version
+- **Direct Fracture Model Test**:
+  ```bash
+  python tests/test_fracture_direct.py <image_path>
+  ```
+- **Inference Pipeline Comparison (Direct vs. FastAPI)**:
+  ```bash
+  python tests/compare_fracture_pipeline.py
+  ```
+  Compares direct execution outputs side-by-side with FastAPI outputs to verify exact bounding boxes and confidence score matches.
 
 ---
 
-## 📸 Screenshots
-
-> (Add your UI screenshots here after building)
-
----
-
-## 🤝 Contribution
-
-Contributions are welcome!
-Feel free to fork the repo and submit pull requests.
-
----
-
-## 📜 License
+## 🤝 License
 
 This project is licensed under the MIT License.
-
----
-
-## 🙌 Acknowledgements
-
-* Medical imaging datasets
-* Open-source AI community
-* Inspiration from modern AI healthcare systems
-
----
-
-## ⭐ Show Your Support
-
-If you like this project, give it a ⭐ on GitHub!
-
----
-
-### 🔥 Built with passion to revolutionize AI in Healthcare 🚀
