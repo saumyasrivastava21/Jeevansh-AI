@@ -30,6 +30,43 @@ React Results Page (with Bounding Boxes & Heatmaps)
 
 ---
 
+## 📂 Repository Structure
+
+```text
+Jeevansh-AI/
+├── ai-service/                # Python FastAPI AI Inference Service
+│   ├── app/
+│   │   ├── api/routes/        # Prediction, model meta, health routing
+│   │   ├── core/config.py     # Global settings
+│   │   ├── schemas/           # Pydantic schema model rules
+│   │   ├── services/          # Inference service wrappers, registry
+│   │   ├── utils/gradcam.py   # Grad-CAM calculations
+│   │   └── main.py            # API entry point
+│   ├── tests/                 # Direct test and comparison scripts
+│   ├── requirements.txt
+│   └── Dockerfile
+├── backend/                   # Node.js + Express Backend
+│   ├── controllers/           # Report creation and user control
+│   ├── middlewares/           # Multer uploads and validation rules
+│   ├── models/                # Mongoose database models
+│   ├── routes/                # Backend routing map
+│   ├── services/aiService.js  # FastAPI microservice wrapper client
+│   ├── public/uploads/        # Static uploads folder
+│   ├── server.js              # Server entry point
+│   └── Dockerfile
+├── frontend/                  # React (Vite) + TS Frontend
+│   ├── src/
+│   │   ├── components/        # Shared UI components
+│   │   ├── pages/             # Dashboard, results views, and auth
+│   │   ├── lib/api.ts         # Axios API backend client
+│   │   └── index.css          # Design system tokens and styles
+│   └── Dockerfile
+├── models/                    # Ignored local model checkpoints (.pt / .pth)
+└── docker-compose.yml         # Container configuration file
+```
+
+---
+
 ## 🎯 Verified Medical AI Models
 
 Jeevansh AI runs 4 medical imaging models in memory with direct-vs-debug pipeline tracking:
