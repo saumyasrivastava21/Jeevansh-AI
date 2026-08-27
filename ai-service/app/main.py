@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.services.model_registry import registry
-from app.api.routes import health, models, prediction
+from app.api.routes import health, models, prediction, report
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -29,6 +29,7 @@ async def startup_event():
 app.include_router(health.router, tags=["System Status"])
 app.include_router(models.router, tags=["Model Meta"])
 app.include_router(prediction.router, tags=["Inference Pipelines"])
+app.include_router(report.router, tags=["Agentic Report Generator"])
 
 @app.get("/")
 async def root():

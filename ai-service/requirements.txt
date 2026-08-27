@@ -4,6 +4,8 @@ python-multipart
 pillow
 numpy
 pydantic
+pydantic-settings
+openai
 torch
 torchvision
 opencv-python-headless

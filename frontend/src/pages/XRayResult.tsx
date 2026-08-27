@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useLocation, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useLocation, Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Download,
@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   Info,
   ZoomIn,
+  Loader2,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,14 +49,193 @@ const severityConfig = {
 
 export default function XRayResult() {
   const location = useLocation();
-  const report = location.state?.report;
+  const initialReport = location.state?.report;
 
   const [heatmap, setHeatmap] = useState(false);
   const [zoom, setZoom] = useState(false);
+  const [reportData, setReportData] = useState(initialReport);
+  const [initialLoading, setInitialLoading] = useState(!initialReport);
+  const [initialError, setInitialError] = useState(null);
+  const [isTimeout, setIsTimeout] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  if (!report) {
-    return <Navigate to="/dashboard" replace />;
+  // Fetch initial report if only reportId in URL is available
+  useEffect(() => {
+    if (reportData) return;
+
+    const queryParams = new URLSearchParams(location.search);
+    const reportId = queryParams.get("reportId");
+    if (!reportId) {
+      setInitialLoading(false);
+      return;
+    }
+
+    async function fetchInitialReport() {
+      try {
+        const token = localStorage.getItem('jeevansh_token');
+        const res = await fetch(`http://localhost:5000/api/reports/${reportId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const apiRes = await res.json();
+          if (apiRes.success && apiRes.data) {
+            setReportData(apiRes.data);
+          } else {
+            setInitialError(apiRes.message || "Failed to load report");
+          }
+        } else {
+          setInitialError("Failed to fetch report from backend");
+        }
+      } catch (err) {
+        setInitialError(err.message || "Network error loading report");
+      } finally {
+        setInitialLoading(false);
+      }
+    }
+
+    fetchInitialReport();
+  }, [location.search, reportData]);
+
+  // Polling effect for background report generation
+  useEffect(() => {
+    if (!reportData?._id) return;
+    if (reportData.reportStatus !== "generating" && reportData.reportStatus !== "pending") return;
+    if (isTimeout) return;
+
+    const startTime = Date.now();
+    const maxDuration = 120000; // 2 minutes
+
+    const intervalId = setInterval(async () => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= maxDuration) {
+        setIsTimeout(true);
+        clearInterval(intervalId);
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('jeevansh_token');
+        const res = await fetch(`http://localhost:5000/api/reports/${reportData._id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (res.ok) {
+          const apiRes = await res.json();
+          if (apiRes.success && apiRes.data) {
+            setReportData(apiRes.data);
+            if (apiRes.data.reportStatus !== "generating" && apiRes.data.reportStatus !== "pending") {
+              clearInterval(intervalId);
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error polling report status:", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(intervalId);
+  }, [reportData?._id, reportData?.reportStatus, isTimeout]);
+
+  if (initialLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 bg-background p-6">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="text-sm text-muted-foreground font-semibold">Loading analysis result...</p>
+      </div>
+    );
   }
+
+  if (initialError || !reportData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 bg-background p-6">
+        <AlertTriangle className="w-10 h-10 text-red-500" />
+        <p className="text-sm font-bold text-foreground">{initialError || "Analysis result not found."}</p>
+        <Button asChild variant="outline">
+          <Link to="/dashboard">Go back to Dashboard</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const report = reportData;
+
+  const handleDownloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const token = localStorage.getItem('jeevansh_token');
+      const response = await fetch(`http://localhost:5000/api/reports/${report._id}/download`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        alert("Failed to download PDF report");
+        return;
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Jeevansh-AI-Report-${report._id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("PDF download failed", error);
+      alert("An error occurred while downloading the report PDF");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    try {
+      setReportData(prev => prev ? { ...prev, reportStatus: "generating" } : prev);
+      setIsTimeout(false);
+      const token = localStorage.getItem('jeevansh_token');
+      const response = await fetch(`http://localhost:5000/api/reports/${report._id}/regenerate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const apiRes = await response.json();
+        if (apiRes.success && apiRes.data) {
+          setReportData(apiRes.data);
+        }
+      } else {
+        alert("Regeneration failed");
+        setReportData(prev => prev ? { ...prev, reportStatus: "failed" } : prev);
+      }
+    } catch (err) {
+      console.error("Regeneration request failed:", err);
+      setReportData(prev => prev ? { ...prev, reportStatus: "failed" } : prev);
+    }
+  };
+
+  const handleRefresh = async () => {
+    try {
+      setIsTimeout(false);
+      const token = localStorage.getItem('jeevansh_token');
+      const res = await fetch(`http://localhost:5000/api/reports/${report._id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const apiRes = await res.json();
+        if (apiRes.success && apiRes.data) {
+          setReportData(apiRes.data);
+        }
+      }
+    } catch (err) {
+      console.error("Refresh failed:", err);
+    }
+  };
 
   const sev =
     severityConfig[report.severity as keyof typeof severityConfig] ||
@@ -86,9 +267,19 @@ export default function XRayResult() {
             })}
           </p>
         </div>
-        <Button variant="medical" className="gap-2">
-          <Download className="w-4 h-4" /> Download Report
-        </Button>
+        {report.reportStatus === "completed" ? (
+          <Button variant="medical" className="gap-2" onClick={handleDownloadPdf} disabled={downloading}>
+            <Download className="w-4 h-4" /> Download Medical Report
+          </Button>
+        ) : report.reportStatus === "generating" ? (
+          <Button variant="outline" className="gap-2" disabled>
+            <Loader2 className="w-4.5 h-4.5 animate-spin text-cyan-500" /> Generating Report...
+          </Button>
+        ) : (
+          <Button variant="outline" className="gap-2" disabled>
+            <AlertTriangle className="w-4.5 h-4.5 text-amber-500" /> Report generation unavailable
+          </Button>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -401,7 +592,160 @@ export default function XRayResult() {
         </Card>
       )}
 
+      {/* AI Medical Report Section */}
+      {report.reportStatus === "completed" && report.medicalReport ? (
+        <Card className="medical-card mt-6 border-cyan-500/30 bg-cyan-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-cyan-600 dark:text-cyan-400 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-cyan-500" /> AI-Generated Medical Report
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              AI-generated interpretation based on verified model output.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h4 className="text-sm font-bold text-foreground mb-1">SUMMARY</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {report.medicalReport.summary}
+              </p>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-bold text-foreground mb-2">FINDINGS</h4>
+              <div className="space-y-3">
+                {(report.medicalReport.findings || []).map((finding: any, idx: number) => (
+                  <div key={idx} className="p-4 rounded-xl bg-background border border-border space-y-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-bold text-foreground">{finding.diseaseName}</span>
+                      <Badge variant={finding.status === "detected" ? "destructive" : "success"}>
+                        <span className="capitalize">{finding.status.replace('_', ' ')}</span>
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
+                      <div>
+                        <span className="font-semibold text-foreground">Inference Model:</span>
+                        <p>{finding.modelName || report.aiModel}</p>
+                      </div>
+                      <div>
+                        <span className="font-semibold text-foreground">Architecture:</span>
+                        <p>{finding.modelArchitecture || (report.taskType === "detection" ? "YOLO11" : "MobileNetV3-Large")}</p>
+                      </div>
+                      {finding.prediction && (
+                        <div>
+                          <span className="font-semibold text-foreground">Prediction:</span>
+                          <p className="capitalize">{finding.prediction.replace(/_/g, " ")}</p>
+                        </div>
+                      )}
+                      {finding.confidence !== null && finding.confidence !== undefined && (
+                        <div>
+                          <span className="font-semibold text-foreground">Confidence:</span>
+                          <p>{finding.confidence}%</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground pt-1">
+                      <span className="font-semibold text-foreground text-xs block mb-0.5">Interpretation:</span>
+                      <p className="leading-relaxed">{finding.interpretation}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-bold text-foreground mb-1">OVERALL ASSESSMENT</h4>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {report.medicalReport.overallAssessment}
+              </p>
+            </div>
+
+            {report.medicalReport.recommendations && report.medicalReport.recommendations.length > 0 && (
+              <div>
+                <h4 className="text-sm font-bold text-foreground mb-1">RECOMMENDATIONS</h4>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  {report.medicalReport.recommendations.map((rec: string, idx: number) => (
+                    <li key={idx}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {report.medicalReport.limitations && report.medicalReport.limitations.length > 0 && (
+              <div>
+                <h4 className="text-sm font-bold text-foreground mb-1">LIMITATIONS</h4>
+                <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                  {report.medicalReport.limitations.map((lim: string, idx: number) => (
+                    <li key={idx}>{lim}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {report.medicalReport.disclaimer && (
+              <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-lg text-xs text-red-500">
+                <span className="font-bold block mb-1">DISCLAIMER</span>
+                <p>{report.medicalReport.disclaimer}</p>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <Button variant="medical" className="gap-2" onClick={handleDownloadPdf} disabled={downloading}>
+                <Download className="w-4 h-4" /> Download Medical Report
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : isTimeout ? (
+        <Card className="medical-card mt-6 bg-muted/20 border-amber-500/30">
+          <CardContent className="p-6 flex flex-col items-center justify-center space-y-3">
+            <AlertTriangle className="w-8 h-8 text-amber-500 animate-pulse" />
+            <div className="text-center">
+              <p className="text-sm font-bold text-foreground">Report generation is taking longer than expected.</p>
+              <p className="text-xs text-muted-foreground">The AI report builder has not completed in the expected 2 minutes. You can manually refresh the status or request a retry.</p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                Refresh Status
+              </Button>
+              <Button variant="medical" size="sm" onClick={handleRegenerate}>
+                Retry Report
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : report.reportStatus === "generating" ? (
+        <Card className="medical-card mt-6 border-cyan-500/30 bg-cyan-500/5">
+          <CardContent className="p-6 flex flex-col items-center justify-center space-y-3">
+            <Loader2 className="w-8 h-8 text-cyan-500 animate-spin" />
+            <div className="text-center">
+              <p className="text-sm font-bold text-foreground">Generating AI Medical Report...</p>
+              <p className="text-xs text-muted-foreground">NVIDIA Nemotron is analyzing the findings and constructing your clinical report.</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="medical-card mt-6 bg-muted/20">
+          <CardContent className="p-6 flex flex-col items-center justify-center space-y-3">
+            <AlertTriangle className="w-8 h-8 text-amber-500" />
+            <div className="text-center">
+              <p className="text-sm font-bold text-foreground">AI report generation is currently unavailable.</p>
+              {report.reportStatus === "failed_validation" ? (
+                <p className="text-xs text-muted-foreground">The generated report did not pass clinical safety validation checks. Raw model outputs remain fully verified.</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">The AI report builder timed out or is temporarily offline. Model inference results are preserved.</p>
+              )}
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRegenerate} className="gap-2 border-primary text-primary hover:bg-primary/5">
+              Retry Report Generation
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+
       {/* Medical Safety Disclaimer */}
+
       <Card className="border-red-200/40 bg-red-500/5 mt-6">
         <CardContent className="p-4 flex items-start gap-4">
           <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />

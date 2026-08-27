@@ -64,6 +64,38 @@ const reportSchema = new mongoose.Schema(
       }
     ],
     reviewedAt: { type: Date },
+    
+    // AI Agentic Report Fields
+    medicalReport: {
+      summary: { type: String },
+      findings: [
+        {
+          diseaseId: { type: String },
+          diseaseName: { type: String },
+          status: { type: String },
+          prediction: { type: String },
+          confidence: { type: Number },
+          interpretation: { type: String },
+          modelArchitecture: { type: String },
+          modelName: { type: String },
+          detectionCount: { type: Number }
+        }
+      ],
+      overallAssessment: { type: String },
+      recommendations: [{ type: String }],
+      limitations: [{ type: String }],
+      urgentAttention: { type: Boolean },
+      disclaimer: { type: String }
+    },
+    reportGeneratedAt: { type: Date },
+    reportModel: { type: String },
+    reportStatus: {
+      type: String,
+      enum: ["pending", "generating", "completed", "failed", "failed_validation"],
+      default: "pending"
+    },
+    reportError: { type: String },
+    reportVersion: { type: String }
   },
   { timestamps: true }
 );

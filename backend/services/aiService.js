@@ -36,4 +36,38 @@ async function predictDisease(filePath, diseaseType) {
   return await response.json();
 }
 
-module.exports = { predictDisease };
+/**
+ * Calls FastAPI Agentic AI report generation endpoint.
+ * @param {Array} predictions - Verified prediction metadata.
+ * @param {object} patientContext - Patient metadata (name, age, gender).
+ * @returns {Promise<object>} Generated report response from the FastAPI service.
+ */
+async function generateMedicalReport(predictions, patientContext) {
+  const aiServiceUrl = process.env.AI_SERVICE_URL || "http://localhost:8000";
+  const endpoint = `${aiServiceUrl}/api/v1/reports/generate`;
+
+  console.log(`[AI-Service Client] Routing report request to FastAPI endpoint: ${endpoint}`);
+
+  const payload = {
+    patient_context: patientContext,
+    predictions: predictions
+  };
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[AI-Service Client] FastAPI report generator error response: ${errorText}`);
+    throw new Error(`Report generation service failed with status ${response.status}`);
+  }
+
+  return await response.json();
+}
+
+module.exports = { predictDisease, generateMedicalReport };

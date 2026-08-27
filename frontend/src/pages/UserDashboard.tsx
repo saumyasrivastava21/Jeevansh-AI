@@ -140,7 +140,7 @@ export default function UserDashboard() {
       });
 
       if (res.success) {
-        navigate("/result", { state: { report: res.data } });
+        navigate(`/result?reportId=${res.data._id}`, { state: { report: res.data } });
       }
     } catch (err) {
       console.error(err);
@@ -352,19 +352,19 @@ export default function UserDashboard() {
                         initial="hidden"
                         animate="visible"
                       >
-                        <Link to="/result" state={{ report }}>
-                          <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-border hover:bg-muted/30 transition-colors">
+                          <div className="flex items-center gap-3 min-w-0">
                             <img
-                              src={report.imageUrl || "/images/diseases/pneumonia.png"}
+                              src={report.imageUrl ? (report.imageUrl.startsWith("http") || report.imageUrl.startsWith("blob:") ? report.imageUrl : `http://localhost:5000${report.imageUrl}`) : "/images/diseases/pneumonia.png"}
                               alt=""
                               className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-black"
                             />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold truncate">
+                            <div className="min-w-0 space-y-0.5">
+                              <p className="text-sm font-bold truncate text-foreground">
                                 {report.diseaseName}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {new Date(report.createdAt).toLocaleDateString(
+                                Date: {new Date(report.createdAt).toLocaleDateString(
                                   "en-IN",
                                   {
                                     day: "numeric",
@@ -373,25 +373,79 @@ export default function UserDashboard() {
                                   }
                                 )}
                               </p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <Badge variant={status.variant}>
-                                {status.label}
-                              </Badge>
-                              <span
-                                className={`text-xs font-semibold ${
-                                  report.confidence > 85
-                                    ? "text-emerald-600"
-                                    : report.confidence > 70
-                                    ? "text-amber-600"
-                                    : "text-red-600"
-                                }`}
-                              >
-                                {report.confidence}%
-                              </span>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <Badge variant={status.variant} className="text-[10px] px-1.5 py-0">
+                                  {status.label}
+                                </Badge>
+                                {report.prediction && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Prediction: <strong className="text-foreground capitalize">{report.prediction.replace(/_/g, " ")}</strong>
+                                  </span>
+                                )}
+                                {report.confidence !== null && report.confidence !== undefined && (
+                                  <span className="text-[11px] text-muted-foreground">
+                                    Confidence: <strong className="text-foreground">{report.confidence}%</strong>
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </Link>
+
+                          <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2">
+                            <span className="text-xs">
+                              {report.reportStatus === "completed" ? (
+                                <Badge variant="success" className="bg-emerald-500/10 text-emerald-500 border-none text-[10px] px-1.5 py-0 font-bold">AI Report: Completed</Badge>
+                              ) : report.reportStatus === "generating" ? (
+                                <Badge variant="warning" className="bg-amber-500/10 text-amber-500 border-none text-[10px] px-1.5 py-0 font-bold animate-pulse">AI Report: Generating...</Badge>
+                              ) : report.reportStatus === "failed_validation" ? (
+                                <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-none text-[10px] px-1.5 py-0 font-bold">AI Report: Validation Failed</Badge>
+                              ) : (
+                                <Badge variant="destructive" className="bg-red-500/10 text-red-500 border-none text-[10px] px-1.5 py-0 font-bold">AI Report: Failed</Badge>
+                              )}
+                            </span>
+                            
+                            <div className="flex items-center gap-2 mt-1 w-full sm:w-auto">
+                              <Button asChild size="sm" variant="outline" className="text-xs h-7 px-2.5">
+                                <Link to={`/result?reportId=${report._id}`} state={{ report }}>
+                                  View Report
+                                </Link>
+                              </Button>
+                              
+                              <Button 
+                                size="sm" 
+                                variant="medical" 
+                                className="text-xs h-7 px-2.5" 
+                                disabled={report.reportStatus !== "completed"}
+                                onClick={async () => {
+                                  try {
+                                    const token = localStorage.getItem('jeevansh_token');
+                                    const response = await fetch(`http://localhost:5000/api/reports/${report._id}/download`, {
+                                      headers: {
+                                        'Authorization': `Bearer ${token}`
+                                      }
+                                    });
+                                    if (response.ok) {
+                                      const blob = await response.blob();
+                                      const url = window.URL.createObjectURL(blob);
+                                      const link = document.createElement('a');
+                                      link.href = url;
+                                      link.setAttribute('download', `Jeevansh-AI-Report-${report._id}.pdf`);
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      link.remove();
+                                    } else {
+                                      alert("Failed to download PDF report");
+                                    }
+                                  } catch (err) {
+                                    console.error("PDF download failed", err);
+                                  }
+                                }}
+                              >
+                                Download PDF
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                       </motion.div>
                     );
                   })}

@@ -1,6 +1,7 @@
 const Report = require("../models/ReportModel");
 const { ApiResponse, ApiError } = require("../utils/apiResponse");
-const { predictDisease } = require("../services/aiService");
+const { predictDisease, generateMedicalReport } = require("../services/aiService");
+const { generateReportPdf } = require("../services/reportPdfService");
 
 const createReport = async (req, res, next) => {
   try {
@@ -51,6 +52,7 @@ const createReport = async (req, res, next) => {
     // Construct image static server link
     const imageUrl = `/uploads/${req.file.filename}`;
 
+    // Create Report Document with status "generating" for the LLM part
     const report = new Report({
       patientId: req.user._id,
       patientName: req.user.name,
@@ -64,7 +66,7 @@ const createReport = async (req, res, next) => {
       severity,
       aiFindings: (aiResult.findings || []).join("\n"),
       recommendation,
-      bboxCoords: null, // Bounding boxes are now inside the detections list
+      bboxCoords: null,
       heatmapImage: aiResult.heatmap_image || null,
       aiModel: aiResult.model.display_name,
       aiModelVersion: aiResult.model.version,
@@ -78,12 +80,20 @@ const createReport = async (req, res, next) => {
         bbox: d.bbox
       })),
       status: "completed",
+      reportStatus: "generating",
     });
 
-    const createdReport = await report.save();
+    let savedReport = await report.save();
+
+    // Trigger report generation in background (non-blocking)
+    const { generateAndPersistReport } = require("../services/reportGenerationService");
+    generateAndPersistReport(savedReport._id).catch(err => {
+      console.error(`[Express] Unhandled error in background report generation for ID: ${savedReport._id}:`, err);
+    });
+
     res
       .status(201)
-      .json(new ApiResponse(201, createdReport, "Report created successfully"));
+      .json(new ApiResponse(201, savedReport, "Report created successfully"));
   } catch (error) {
     next(error);
   }
@@ -136,9 +146,87 @@ const updateReportStatus = async (req, res, next) => {
   }
 };
 
+// GET /api/reports/:id
+const getReportById = async (req, res, next) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) {
+      return next(new ApiError(404, "Report not found"));
+    }
+
+    // Authorization: Patients can only see their own reports. Doctors & Admins can see any.
+    if (req.user.role === "patient" && report.patientId.toString() !== req.user._id.toString()) {
+      return next(new ApiError(403, "Access Denied: You are not authorized to view this report"));
+    }
+
+    res.json(new ApiResponse(200, report, "Report fetched successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+// POST /api/reports/:id/regenerate
+const regenerateReport = async (req, res, next) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) {
+      return next(new ApiError(404, "Report not found"));
+    }
+
+    // Authorization
+    if (req.user.role === "patient" && report.patientId.toString() !== req.user._id.toString()) {
+      return next(new ApiError(403, "Access Denied: You are not authorized to modify this report"));
+    }
+
+    report.reportStatus = "generating";
+    report.reportError = null;
+    let savedReport = await report.save();
+
+    // Trigger report generation in background (non-blocking)
+    const { generateAndPersistReport } = require("../services/reportGenerationService");
+    generateAndPersistReport(savedReport._id).catch(err => {
+      console.error(`[Express] Unhandled error in background report regeneration for ID: ${savedReport._id}:`, err);
+    });
+
+    res.json(new ApiResponse(200, savedReport, "Report regeneration started successfully"));
+  } catch (error) {
+    next(error);
+  }
+};
+
+// GET /api/reports/:id/download
+const downloadReportPdf = async (req, res, next) => {
+  try {
+    const report = await Report.findById(req.params.id);
+    if (!report) {
+      return next(new ApiError(404, "Report not found"));
+    }
+
+    // Authorization
+    if (req.user.role === "patient" && report.patientId.toString() !== req.user._id.toString()) {
+      return next(new ApiError(403, "Access Denied: You are not authorized to download this report"));
+    }
+
+    // Set Response Headers for file download
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="Jeevansh-AI-Report-${report._id.toString()}.pdf"`
+    );
+
+    // Call PDF Service to pipe content directly to express response
+    generateReportPdf(report, res);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createReport,
   getPatientReports,
   getAllReports,
   updateReportStatus,
+  getReportById,
+  regenerateReport,
+  downloadReportPdf,
 };

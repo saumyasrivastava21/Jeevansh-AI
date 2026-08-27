@@ -746,7 +746,28 @@ const seedDatabase = async () => {
     console.log("\n📋 Seeding Reports...");
     const reportDocs = mockReportsData.map((r) => {
       const { patientEmail, ...reportData } = r;
-      return { ...reportData, patientId: userByEmail[patientEmail] };
+      const diseaseIdMap = {
+        "pneumonia": "pneumonia",
+        "bone-fracture": "bone_fracture",
+        "brain-tumor": "brain_tumor",
+        "tuberculosis": "tuberculosis",
+        "lung-cancer": "lung_cancer"
+      };
+      const aiModelMap = {
+        "pneumonia": "MobileNetV3-Large — Pneumonia Classifier",
+        "bone-fracture": "YOLO11 — Bone Fracture Detector",
+        "brain-tumor": "YOLOv9m — Brain Tumor Detector",
+        "tuberculosis": "MobileNetV3-Large — Tuberculosis Classifier",
+        "lung-cancer": "MobileNetV3-Large — Lung Cancer Classifier"
+      };
+      return { 
+        ...reportData, 
+        patientId: userByEmail[patientEmail],
+        diseaseId: diseaseIdMap[reportData.disease] || reportData.disease,
+        hasFinding: reportData.confidence ? reportData.confidence > 50 : false,
+        aiModel: aiModelMap[reportData.disease] || "Jeevansh AI",
+        taskType: (reportData.disease === "bone-fracture" || reportData.disease === "brain-tumor") ? "detection" : "classification"
+      };
     });
     const createdReports = await Report.insertMany(reportDocs);
     console.log(`   ✅ ${createdReports.length} reports created`);

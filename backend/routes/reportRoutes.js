@@ -4,6 +4,9 @@ const {
   getPatientReports,
   getAllReports,
   updateReportStatus,
+  getReportById,
+  regenerateReport,
+  downloadReportPdf,
 } = require("../controllers/reportController");
 const { protect, authorize } = require("../middlewares/authMiddleware");
 const upload = require("../middlewares/uploadMiddleware");
@@ -25,5 +28,10 @@ router.put(
   authorize("doctor", "admin"),
   updateReportStatus
 );
+
+router.get("/:id", protect, getReportById);
+router.post("/:id/regenerate", protect, regenerateReport);
+router.get("/:id/regenerate", protect, regenerateReport);
+router.get("/:id/download", protect, downloadReportPdf);
 
 module.exports = router;

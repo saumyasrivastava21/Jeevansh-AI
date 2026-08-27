@@ -18,6 +18,9 @@ services:
     environment:
       - PORT=8000
       - HOST=0.0.0.0
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}
+      - NVIDIA_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
     restart: unless-stopped
 
   backend:
