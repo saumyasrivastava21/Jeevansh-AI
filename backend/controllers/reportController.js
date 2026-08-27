@@ -202,6 +202,11 @@ const downloadReportPdf = async (req, res, next) => {
       return next(new ApiError(404, "Report not found"));
     }
 
+    // Null guard — protect middleware may not have resolved user if token was malformed
+    if (!req.user) {
+      return next(new ApiError(401, "Not authorized"));
+    }
+
     // Authorization
     if (req.user.role === "patient" && report.patientId.toString() !== req.user._id.toString()) {
       return next(new ApiError(403, "Access Denied: You are not authorized to download this report"));
@@ -217,7 +222,12 @@ const downloadReportPdf = async (req, res, next) => {
     // Call PDF Service to pipe content directly to express response
     generateReportPdf(report, res);
   } catch (error) {
-    next(error);
+    // Only call next if headers have not already been sent
+    if (!res.headersSent) {
+      next(error);
+    } else {
+      console.error("[Express] PDF generation error after headers sent:", error.message);
+    }
   }
 };
 

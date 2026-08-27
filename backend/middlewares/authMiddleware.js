@@ -15,7 +15,7 @@ const protect = async (req, res, next) => {
         token,
         process.env.JWT_SECRET || "fallback_secret_key_123"
       );
-      req.user = await User.findById(decoded.id).select("-password");
+      req.user = await User.findById(decoded._id || decoded.id).select("-password");
       return next();
     } catch (error) {
       return next(new ApiError(401, "Not authorized, token failed"));

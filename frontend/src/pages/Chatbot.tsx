@@ -30,24 +30,12 @@ const INITIAL_MESSAGES: Message[] = [
   },
 ];
 
-const MOCK_RESPONSES: Record<string, string> = {
-  default: "Based on your query, here's what our AI medical knowledge base suggests:\n\nThis is detailed medical guidance based on the latest clinical guidelines. Please remember that while I provide evidence-based information, you should always consult a qualified healthcare professional for personal medical advice.\n\nWould you like me to elaborate on any specific aspect of this topic?",
-  pneumonia: "Pneumonia is a lung infection that inflames air sacs. Common symptoms include:\n\n• Cough with phlegm\n• Fever, chills, sweating\n• Shortness of breath\n• Chest pain when breathing\n• Fatigue and weakness\n\nTreatment typically involves antibiotics (bacterial type), rest, and fluids. Severe cases may require hospitalization. Recovery usually takes 1–3 weeks with proper treatment.",
-  serious: "Based on your scan results showing 91.4% confidence for pneumonia with High severity:\n\n⚠️ **Action Required:**\n1. Start antibiotic treatment immediately as prescribed\n2. Monitor oxygen saturation (should be >95%)\n3. Follow up chest X-ray in 4-6 weeks\n4. Seek emergency care if breathing worsens\n\nWith prompt treatment, most pneumonia patients recover fully. Your assigned doctor Dr. Rajesh Verma has been notified.",
-};
-
-function getResponse(input: string): string {
-  const low = input.toLowerCase();
-  if (low.includes('pneumonia') || low.includes('lung')) return MOCK_RESPONSES.pneumonia;
-  if (low.includes('serious') || low.includes('dangerous') || low.includes('worried')) return MOCK_RESPONSES.serious;
-  return MOCK_RESPONSES.default;
-}
-
 export default function Chatbot() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,15 +43,50 @@ export default function Chatbot() {
   }, [messages, typing]);
 
   const sendMessage = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() || typing) return;
+    setError(null);
+
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content: text, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setTyping(true);
-    await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
-    setTyping(false);
-    const aiMsg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: getResponse(text), timestamp: new Date() };
-    setMessages(prev => [...prev, aiMsg]);
+
+    try {
+      const token = localStorage.getItem('jeevansh_token');
+      // Build history from all messages except the initial greeting and the one we just added
+      const history = messages
+        .filter(m => m.id !== '0')
+        .map(m => ({ role: m.role, content: m.content }));
+
+      const res = await fetch('http://localhost:5000/api/chatbot/message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message: text.trim(), history }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Chatbot service unavailable');
+      }
+
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.reply,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, aiMsg]);
+    } catch (err: any) {
+      console.error('[Chatbot] Error:', err);
+      setError(err.message || 'Failed to get a response. Please try again.');
+      // Remove the user message optimistically added if request fails
+    } finally {
+      setTyping(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -162,6 +185,11 @@ export default function Chatbot() {
 
       {/* Input */}
       <div className="px-4 py-4 border-t border-border bg-background/80 backdrop-blur-sm">
+        {error && (
+          <div className="mb-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-500 max-w-3xl mx-auto">
+            ⚠️ {error}
+          </div>
+        )}
         <div className="flex gap-2 items-end max-w-3xl mx-auto">
           <Textarea
             className="flex-1 min-h-[44px] max-h-32 resize-none rounded-xl border-border"

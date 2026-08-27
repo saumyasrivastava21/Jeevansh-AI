@@ -183,6 +183,7 @@ export default function XRayResult() {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("PDF download failed", error);
       alert("An error occurred while downloading the report PDF");

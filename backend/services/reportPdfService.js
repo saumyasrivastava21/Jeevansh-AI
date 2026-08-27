@@ -6,7 +6,7 @@ const PDFDocument = require("pdfkit");
  * @param {stream.Writable} writeStream - Writable stream (usually Express res).
  */
 function generateReportPdf(report, writeStream) {
-  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  const doc = new PDFDocument({ margin: 50, size: "A4", bufferPages: true });
   doc.pipe(writeStream);
 
   // Colors
@@ -205,18 +205,19 @@ function generateReportPdf(report, writeStream) {
   const disclaimerText = "This report is generated using artificial intelligence and is intended to assist qualified healthcare professionals. It does not constitute a definitive medical diagnosis and should not replace professional clinical evaluation.";
   doc.fillColor("#991b1b").font("Helvetica").fontSize(7.5).text(disclaimerText, 60, currentY + 18, { width: 475 });
 
-  // 6. Footer (Page numbers etc.)
-  const pages = doc._pageBuffer.length;
-  for (let i = 0; i < pages; i++) {
-    doc.switchToPage(i);
+  // 6. Footer (Page numbers — bufferPages:true required for switchToPage to work)
+  const pages = doc.bufferedPageRange();
+  for (let i = 0; i < pages.count; i++) {
+    doc.switchToPage(pages.start + i);
     doc.fillColor("#94a3b8").fontSize(7.5).font("Helvetica").text(
-      `Jeevansh AI - Confidential Medical Report  |  Page ${i + 1} of ${pages}`,
+      `Jeevansh AI - Confidential Medical Report  |  Page ${i + 1} of ${pages.count}`,
       50,
       800,
       { align: "center", width: 495 }
     );
   }
 
+  doc.flushPages();
   doc.end();
 }
 

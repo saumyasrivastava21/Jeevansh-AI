@@ -9,6 +9,7 @@ const userRoutes = require("./routes/userRoutes");
 const doctorRoutes = require("./routes/doctorRoutes");
 const diseaseRoutes = require("./routes/diseaseRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const chatbotRoutes = require("./routes/chatbotRoutes");
 
 // Middleware
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
@@ -43,6 +44,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/diseases", diseaseRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 app.get("/", (req, res) => {
   res.send("API is running...");
