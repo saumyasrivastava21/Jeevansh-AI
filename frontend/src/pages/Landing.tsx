@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import AI3DVisualization from '@/components/AI3DVisualization';
 
 const landingTeam = [
   {
@@ -165,35 +166,29 @@ export default function Landing() {
 
           {/* Right — AI scan animation */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.4, duration: 0.8 }}
-            className="hidden lg:flex items-center justify-center"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4, duration: 0.8 }}
+            className="hidden lg:flex items-center justify-center relative w-full h-[400px]"
           >
-            <div className="relative w-80 h-80">
-              {/* Outer pulse rings */}
-              <div className="absolute inset-0 rounded-full border-2 border-medical-cyan/20 animate-ping" style={{ animationDuration: '3s' }} />
-              <div className="absolute inset-8 rounded-full border-2 border-medical-cyan/30 animate-ping" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }} />
-              {/* Center */}
-              <div className="absolute inset-16 rounded-full bg-medical-cyan/20 border-2 border-medical-cyan/60 flex items-center justify-center glow-cyan">
-                <Activity className="w-20 h-20 text-medical-cyan animate-float" />
-              </div>
-              {/* Scan line */}
-              <div className="absolute inset-16 rounded-full overflow-hidden">
-                <div className="absolute left-0 right-0 h-0.5 bg-medical-cyan/60 animate-scan-line" style={{ boxShadow: '0 0 10px rgba(0,209,255,0.8)' }} />
-              </div>
-              {/* Floating badges */}
+            <div className="absolute inset-0 z-0">
+              <AI3DVisualization />
+            </div>
+            {/* Floating badges */}
+            <div className="relative z-10 w-full h-full pointer-events-none">
               {[
-                { label: 'Pneumonia', conf: '91%', pos: 'top-4 -left-8', color: 'bg-cyan-500' },
-                { label: 'Clear', conf: '99%', pos: 'bottom-4 -right-8', color: 'bg-emerald-500' },
-                { label: 'Analyzing...', conf: '', pos: 'top-1/2 -right-16', color: 'bg-amber-500' },
+                { label: 'Pneumonia Detector', pos: 'top-8 left-12', color: 'bg-cyan-500' },
+                { label: 'Skin Cancer Classifier', pos: 'bottom-12 right-12', color: 'bg-emerald-500' },
+                { label: 'Brain Tumor Detection', pos: 'top-1/2 right-4', color: 'bg-amber-500' },
               ].map(b => (
                 <motion.div
                   key={b.label}
-                  animate={{ y: [0, -5, 0] }}
+                  animate={{ y: [0, -6, 0] }}
                   transition={{ repeat: Infinity, duration: 3, delay: Math.random() * 2 }}
-                  className={`absolute ${b.pos} px-3 py-1.5 rounded-lg glass-dark text-white text-xs font-medium flex items-center gap-1.5`}
+                  className={`absolute ${b.pos} px-3 py-1.5 rounded-lg glass-dark text-white text-xs font-semibold flex items-center gap-1.5`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${b.color}`} />
-                  {b.label} {b.conf && <span className="text-medical-cyan">{b.conf}</span>}
+                  <span className={`w-2 h-2 rounded-full ${b.color} animate-pulse`} />
+                  {b.label}
                 </motion.div>
               ))}
             </div>
@@ -327,8 +322,17 @@ export default function Landing() {
 
           <div className="grid md:grid-cols-3 gap-8">
             {landingTeam.map((member, i) => (
-              <motion.div key={member.name} variants={fadeUp} custom={i} initial="hidden" whileInView="visible" viewport={{ once: true }}>
-                <Card className="medical-card h-full overflow-hidden bg-card/60 backdrop-blur-xl">
+              <motion.div
+                key={member.name}
+                variants={fadeUp}
+                custom={i}
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true }}
+                whileHover={{ rotateY: 8, rotateX: -4, scale: 1.02 }}
+                style={{ transformStyle: 'preserve-3d', perspective: 1000 }}
+              >
+                <Card className="medical-card h-full overflow-hidden bg-card/60 backdrop-blur-xl transition-all duration-300">
                   <CardContent className="p-6 flex flex-col items-center text-center space-y-6">
                     {/* Holographic Avatar */}
                     <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-medical-blue/20 via-medical-cyan/20 to-primary/10 border-2 border-primary/20 flex items-center justify-center relative shadow-inner">
