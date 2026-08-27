@@ -16,7 +16,7 @@ from app.schemas.prediction import (
 router = APIRouter()
 
 @router.post("/predict/{disease_type}", response_model=PredictionResponse)
-async def predict_disease(disease_type: str, image: UploadFile = File(...)):
+async def predict_disease(disease_type: str, image: UploadFile = File(...), explain: bool = False):
     # Retrieve model from registry
     model = registry.get_model(disease_type)
     if not model:
@@ -60,7 +60,7 @@ async def predict_disease(disease_type: str, image: UploadFile = File(...)):
             print(f"[Fracture Input] Saved debug input image to {debug_input_path}\n")
 
         # Execute prediction
-        result = model.predict(image_bytes)
+        result = model.predict(image_bytes, explain=explain)
         
         # Map to validated Pydantic model response
         return PredictionResponse(
@@ -116,4 +116,72 @@ async def predict_disease(disease_type: str, image: UploadFile = File(...)):
         raise HTTPException(
             status_code=500,
             detail=f"AI Service Inference Error: {str(e)}"
+        )
+
+@router.post("/explain/{disease_type}")
+async def explain_disease(disease_type: str, image: UploadFile = File(...), class_idx: int = None):
+    model = registry.get_model(disease_type)
+    if not model:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Model for disease type '{disease_type}' is not supported."
+        )
+        
+    if not image.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded item must be an image."
+        )
+        
+    try:
+        image_bytes = await image.read()
+        
+        if model.task_type == "classification":
+            import torch
+            from app.utils.gradcam import GradCAM, overlay_heatmap_on_image
+            from app.services.inference_service import DEVICE, PRECISION
+            
+            pil_image = Image.open(io.BytesIO(image_bytes))
+            img_rgb = pil_image.convert("RGB")
+            
+            input_tensor = model.transform(img_rgb).unsqueeze(0).to(DEVICE)
+            if PRECISION == "fp16" and "cuda" in DEVICE:
+                input_tensor = input_tensor.half()
+                
+            if class_idx is None:
+                with torch.inference_mode():
+                    output = model.model(input_tensor)
+                    class_idx = output.argmax(dim=1).item()
+                    
+            target_layer = model.get_gradcam_target_layer()
+            gradcam = GradCAM(model.model, target_layer)
+            try:
+                heatmap_np = gradcam.generate(input_tensor, class_idx)
+                heatmap_base64 = overlay_heatmap_on_image(img_rgb, heatmap_np, alpha=0.45)
+                return {
+                    "success": True,
+                    "heatmap_image": heatmap_base64,
+                    "gradcam_status": "completed"
+                }
+            except Exception as e_grad:
+                print(f"Grad-CAM explain endpoint failed: {str(e_grad)}")
+                return {
+                    "success": False,
+                    "heatmap_image": None,
+                    "gradcam_status": "failed",
+                    "message": str(e_grad)
+                }
+            finally:
+                gradcam.remove_hooks()
+        else:
+            result = model.predict(image_bytes, explain=True)
+            return {
+                "success": True,
+                "heatmap_image": result.get("heatmap_image"),
+                "gradcam_status": "completed"
+            }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Explainability generation error: {str(e)}"
         )

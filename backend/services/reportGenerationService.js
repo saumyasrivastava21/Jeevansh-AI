@@ -1,20 +1,51 @@
+const path = require("path");
 const Report = require("../models/ReportModel");
-const { generateMedicalReport } = require("./aiService");
+const { generateMedicalReport, getGradcamHeatmap } = require("./aiService");
 
 /**
- * Generates the medical report asynchronously in the background and persists it to MongoDB.
+ * Generates the medical report and Grad-CAM explainability asynchronously in the background and persists them to MongoDB.
  * @param {string} reportId - The MongoDB document ID of the report.
  */
 async function generateAndPersistReport(reportId) {
-  console.log(`[Background Report Service] Starting report generation for ID: ${reportId}`);
+  console.log(`[Background Report Service] Starting background processing for ID: ${reportId}`);
   try {
-    const report = await Report.findById(reportId);
+    let report = await Report.findById(reportId);
     if (!report) {
       console.error(`[Background Report Service] Report not found: ${reportId}`);
       return;
     }
 
-    // Map stored database fields back to the FastAPI report generator payload
+    // 1. If classification and heatmap is missing, generate Grad-CAM in background
+    if (report.taskType === "classification" && (!report.heatmapImage || report.gradcamStatus === "generating" || report.gradcamStatus === "pending")) {
+      console.log(`[Background Report Service] Triggering Grad-CAM generation for ID: ${reportId}`);
+      try {
+        const localImagePath = path.join(__dirname, "../public", report.imageUrl);
+        let normalizedDisease = report.disease;
+        if (report.disease === "bone-fracture") {
+          normalizedDisease = "fracture";
+        }
+        
+        const heatmapResult = await getGradcamHeatmap(localImagePath, normalizedDisease);
+        if (heatmapResult && heatmapResult.heatmap_image) {
+          report.heatmapImage = heatmapResult.heatmap_image;
+          report.gradcamStatus = "completed";
+          console.log(`[Background Report Service] Grad-CAM generated successfully for ID: ${reportId}`);
+        } else {
+          report.gradcamStatus = "failed";
+          console.warn(`[Background Report Service] Grad-CAM returned empty response for ID: ${reportId}`);
+        }
+      } catch (gcErr) {
+        console.error(`[Background Report Service] Grad-CAM background generation failed for ID: ${reportId}: ${gcErr.message}`);
+        report.gradcamStatus = "failed";
+      }
+      // Save gradcam update
+      report = await report.save();
+    } else if (report.taskType === "detection") {
+      report.gradcamStatus = "completed";
+      report = await report.save();
+    }
+
+    // 2. Map stored database fields back to the FastAPI report generator payload
     const predictionsPayload = [
       {
         diseaseId: report.diseaseId,

@@ -81,6 +81,7 @@ const createReport = async (req, res, next) => {
       })),
       status: "completed",
       reportStatus: "generating",
+      gradcamStatus: aiResult.task_type === "classification" ? "generating" : "completed",
     });
 
     let savedReport = await report.save();

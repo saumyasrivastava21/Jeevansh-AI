@@ -14,4 +14,8 @@ class Settings:
     NVIDIA_MODEL: str = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b")
     NVIDIA_BASE_URL: str = os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1")
 
+    # Local Model Configs
+    MODEL_DEVICE: str = os.getenv("MODEL_DEVICE", "auto")
+    MODEL_PRECISION: str = os.getenv("MODEL_PRECISION", "auto")
+
 settings = Settings()

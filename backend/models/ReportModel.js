@@ -95,7 +95,12 @@ const reportSchema = new mongoose.Schema(
       default: "pending"
     },
     reportError: { type: String },
-    reportVersion: { type: String }
+    reportVersion: { type: String },
+    gradcamStatus: {
+      type: String,
+      enum: ["pending", "generating", "completed", "failed", "unavailable"],
+      default: "pending"
+    }
   },
   { timestamps: true }
 );

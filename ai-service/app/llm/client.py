@@ -23,7 +23,7 @@ class NVIDIAClient:
         user_prompt: str, 
         temperature: float = 0.2, 
         top_p: float = 0.9, 
-        max_tokens: int = 4096
+        max_tokens: int = 2000
     ) -> str:
         """
         Sends generation requests to NVIDIA Nemotron OpenAI-compatible endpoint.

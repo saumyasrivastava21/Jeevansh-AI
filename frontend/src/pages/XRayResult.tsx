@@ -101,20 +101,26 @@ export default function XRayResult() {
     fetchInitialReport();
   }, [location.search, reportData]);
 
-  // Polling effect for background report generation
+  // Polling effect for background report & gradcam generation
   useEffect(() => {
     if (!reportData?._id) return;
-    if (reportData.reportStatus !== "generating" && reportData.reportStatus !== "pending") return;
+    
+    const isReportPending = reportData.reportStatus === "generating" || reportData.reportStatus === "pending";
+    const isGradcamPending = reportData.taskType === "classification" && 
+      (reportData.gradcamStatus === "generating" || reportData.gradcamStatus === "pending" || !reportData.heatmapImage);
+    
+    if (!isReportPending && !isGradcamPending) return;
     if (isTimeout) return;
 
     const startTime = Date.now();
-    const maxDuration = 120000; // 2 minutes
+    const maxDuration = 60000; // 60 seconds max timeout
+    let timerId: any;
+    let currentDelay = 1000; // start at 1 second
 
-    const intervalId = setInterval(async () => {
+    const checkStatus = async () => {
       const elapsed = Date.now() - startTime;
       if (elapsed >= maxDuration) {
         setIsTimeout(true);
-        clearInterval(intervalId);
         return;
       }
 
@@ -129,18 +135,28 @@ export default function XRayResult() {
           const apiRes = await res.json();
           if (apiRes.success && apiRes.data) {
             setReportData(apiRes.data);
-            if (apiRes.data.reportStatus !== "generating" && apiRes.data.reportStatus !== "pending") {
-              clearInterval(intervalId);
+            const stillReportPending = apiRes.data.reportStatus === "generating" || apiRes.data.reportStatus === "pending";
+            const stillGradcamPending = apiRes.data.taskType === "classification" && 
+              (apiRes.data.gradcamStatus === "generating" || apiRes.data.gradcamStatus === "pending" || !apiRes.data.heatmapImage);
+            
+            if (!stillReportPending && !stillGradcamPending) {
+              return; // Stop polling
             }
           }
         }
       } catch (err) {
         console.error("Error polling report status:", err);
       }
-    }, 2000);
 
-    return () => clearInterval(intervalId);
-  }, [reportData?._id, reportData?.reportStatus, isTimeout]);
+      // Increase delay: 1000ms -> 2000ms -> 3000ms
+      currentDelay = Math.min(currentDelay + 1000, 3000);
+      timerId = setTimeout(checkStatus, currentDelay);
+    };
+
+    timerId = setTimeout(checkStatus, currentDelay);
+
+    return () => clearTimeout(timerId);
+  }, [reportData?._id, reportData?.reportStatus, reportData?.gradcamStatus, isTimeout]);
 
   if (initialLoading) {
     return (
@@ -280,7 +296,20 @@ export default function XRayResult() {
         {/* Image panel */}
         <Card className="medical-card">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-base">Medical Scan</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              Medical Scan
+              {report.taskType === "classification" && (
+                report.gradcamStatus === "completed" ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold">Grad-CAM: Ready</span>
+                ) : report.gradcamStatus === "generating" ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-bold animate-pulse">Grad-CAM: Generating...</span>
+                ) : report.gradcamStatus === "failed" ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-500 border border-red-500/20 font-bold">Grad-CAM: Failed</span>
+                ) : (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border font-bold">Grad-CAM: Pending</span>
+                )
+              )}
+            </CardTitle>
             <div className="flex gap-2">
               <Button
                 variant={heatmap ? "medical" : "outline"}
@@ -315,6 +344,15 @@ export default function XRayResult() {
                     : "grayscale(0.3)",
                 }}
               />
+              
+              {/* Blur loader when Grad-CAM heatmap is toggled but not yet finished background generation */}
+              {heatmap && report.taskType === "classification" && !report.heatmapImage && (
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center space-y-2">
+                  <Loader2 className="w-6 h-6 text-primary animate-spin" />
+                  <p className="text-xs text-muted-foreground font-semibold">Generating explainability overlay...</p>
+                </div>
+              )}
+
               {/* Heatmap overlay (Attention Overlay for YOLO, Grad-CAM for Classification) */}
               {heatmap && (report.taskType === "detection" ? (
                 // Draw attention circles centered on each detection
@@ -328,6 +366,7 @@ export default function XRayResult() {
                         top: `${d.bbox.y}%`,
                         width: `${d.bbox.w}%`,
                         height: `${d.bbox.h}%`,
+                        transform: "translate(-50%, -50%)" // center the circle correctly
                       }}
                     />
                   ))}

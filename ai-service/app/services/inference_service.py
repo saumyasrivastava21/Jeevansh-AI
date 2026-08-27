@@ -11,6 +11,22 @@ import os
 import io
 
 from app.utils.gradcam import GradCAM, overlay_heatmap_on_image
+from app.core.config import settings
+
+# Configure Device & Precision
+env_device = settings.MODEL_DEVICE.lower() if hasattr(settings, 'MODEL_DEVICE') else 'auto'
+if env_device == 'auto':
+    DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+else:
+    DEVICE = env_device
+
+env_precision = settings.MODEL_PRECISION.lower() if hasattr(settings, 'MODEL_PRECISION') else 'auto'
+if env_precision == 'auto':
+    PRECISION = 'fp16' if 'cuda' in DEVICE else 'fp32'
+else:
+    PRECISION = env_precision
+
+print(f"[Inference Service] Configured device: {DEVICE}, precision: {PRECISION}")
 
 # ─── Fallback Custom CNN (Uses 0 Memory) ────────────────────────
 class FallbackCNN(nn.Module):
@@ -88,6 +104,11 @@ class MobileNetV3ModelWrapper(BaseMedicalModelWrapper):
                 print(f"[Model Loader] Error loading {name}: {str(e)}. Initializing fallback CNN.")
                 self.model = FallbackCNN(num_classes=num_classes)
                 self.is_fallback = True
+
+        # Move to DEVICE and set precision
+        self.model.to(DEVICE)
+        if PRECISION == "fp16" and "cuda" in DEVICE:
+            self.model = self.model.half()
                 
         # Standard normalization transform using dynamic imgsz
         self.transform = transforms.Compose([
@@ -103,25 +124,69 @@ class MobileNetV3ModelWrapper(BaseMedicalModelWrapper):
         # For MobileNetV3-Large, features[16][0] is the final Conv2d layer
         return self.model.features[16][0]
 
-    def predict(self, image_bytes: bytes) -> Dict[str, Any]:
+    def predict(self, image_bytes: bytes, explain: bool = False) -> Dict[str, Any]:
         start_time = time.time()
         pil_image = Image.open(io.BytesIO(image_bytes))
         img_rgb = pil_image.convert("RGB")
-        input_tensor = self.transform(img_rgb).unsqueeze(0)
         
-        target_layer = self.get_gradcam_target_layer()
-        gradcam = GradCAM(self.model, target_layer)
+        # Load input tensor, move to device and convert precision
+        input_tensor = self.transform(img_rgb).unsqueeze(0).to(DEVICE)
+        if PRECISION == "fp16" and "cuda" in DEVICE:
+            input_tensor = input_tensor.half()
+        
+        heatmap_base64 = None
+        explainability_info = None
         
         try:
-            output = self.model(input_tensor)
-            probabilities_tensor = torch.softmax(output, dim=1)[0]
-            
-            class_idx = output.argmax(dim=1).item()
-            winning_label = self.classes[class_idx]
-            winning_confidence = float(probabilities_tensor[class_idx].item())
-            
-            # Generate Grad-CAM map
-            heatmap_np = gradcam.generate(input_tensor, class_idx)
+            if explain:
+                # Grad-CAM requires gradient calculation, so we don't use torch.inference_mode()
+                target_layer = self.get_gradcam_target_layer()
+                gradcam = GradCAM(self.model, target_layer)
+                try:
+                    output = self.model(input_tensor)
+                    probabilities_tensor = torch.softmax(output, dim=1)[0]
+                    class_idx = output.argmax(dim=1).item()
+                    winning_label = self.classes[class_idx]
+                    winning_confidence = float(probabilities_tensor[class_idx].item())
+                    
+                    heatmap_np = gradcam.generate(input_tensor, class_idx)
+                    heatmap_base64 = overlay_heatmap_on_image(img_rgb, heatmap_np, alpha=0.45)
+                    explainability_info = {
+                        "type": "gradcam",
+                        "available": True,
+                        "image": heatmap_base64
+                    }
+                except Exception as e_grad:
+                    print(f"Grad-CAM generation error in {self.model_name}: {str(e_grad)}")
+                    # Return fallback when Grad-CAM fails
+                    output = self.model(input_tensor)
+                    probabilities_tensor = torch.softmax(output, dim=1)[0]
+                    class_idx = output.argmax(dim=1).item()
+                    winning_label = self.classes[class_idx]
+                    winning_confidence = float(probabilities_tensor[class_idx].item())
+                    heatmap_base64 = None
+                    explainability_info = {
+                        "type": "gradcam",
+                        "available": False,
+                        "image": None
+                    }
+                finally:
+                    gradcam.remove_hooks()
+            else:
+                # Fast inference mode
+                with torch.inference_mode():
+                    output = self.model(input_tensor)
+                    probabilities_tensor = torch.softmax(output, dim=1)[0]
+                    class_idx = output.argmax(dim=1).item()
+                    winning_label = self.classes[class_idx]
+                    winning_confidence = float(probabilities_tensor[class_idx].item())
+                    
+                heatmap_base64 = None
+                explainability_info = {
+                    "type": "gradcam",
+                    "available": False,
+                    "image": None
+                }
             
             probabilities = {}
             for idx, cls in enumerate(self.classes):
@@ -129,16 +194,17 @@ class MobileNetV3ModelWrapper(BaseMedicalModelWrapper):
                 
         except Exception as e:
             print(f"Inference error in {self.model_name}: {str(e)}")
-            # Fallback output
             winning_label = self.classes[0]
             winning_confidence = 0.90
             probabilities = {cls: 0.10 for cls in self.classes}
             probabilities[winning_label] = 0.90
-            heatmap_np = np.zeros((self.imgsz, self.imgsz), dtype=np.float32)
-        finally:
-            gradcam.remove_hooks()
+            heatmap_base64 = None
+            explainability_info = {
+                "type": "gradcam",
+                "available": False,
+                "image": None
+            }
             
-        heatmap_base64 = overlay_heatmap_on_image(img_rgb, heatmap_np, alpha=0.45)
         processing_time_ms = float((time.time() - start_time) * 1000)
         
         # Determine has_finding dynamically
@@ -170,11 +236,7 @@ class MobileNetV3ModelWrapper(BaseMedicalModelWrapper):
                 "version": self.model_version
             },
             "heatmap_image": heatmap_base64,
-            "explainability": {
-                "type": "gradcam",
-                "available": True,
-                "image": heatmap_base64
-            },
+            "explainability": explainability_info,
             "inference_time_ms": processing_time_ms
         }
 
@@ -226,10 +288,9 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
                     print(f"[Model Loader] Error loading YOLO {name}: {str(e)}. Using fallback mode.")
                     self.is_fallback = True
 
-    def predict(self, image_bytes: bytes) -> Dict[str, Any]:
+    def predict(self, image_bytes: bytes, explain: bool = False) -> Dict[str, Any]:
         start_time = time.time()
         
-        # Load PIL image for dimensions and helper functions (keeps overlay generation clean)
         pil_image = Image.open(io.BytesIO(image_bytes))
         w, h = pil_image.size
         
@@ -237,7 +298,7 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
         detections = []
         xyxy_top = None
         
-        # Raw max confidence tracker (for debugging/diagnostic logging)
+        # Raw max confidence tracker (for debug logging)
         max_raw_conf = 0.0
         
         if not self.is_fallback:
@@ -245,24 +306,29 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
                 import cv2
                 import numpy as np
                 
-                # Decode image bytes using OpenCV (loads as BGR uint8) to replicate direct inference exactly
+                # Decode image bytes using OpenCV (loads as BGR uint8)
                 nparr = np.frombuffer(image_bytes, np.uint8)
                 img_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 
-                # Retrieve model config thresholds (e.g. conf=0.25, iou=0.45)
                 conf_thresh = 0.25
                 iou_thresh = 0.45
                 
-                # Perform raw debug prediction at conf=0.001 to get max raw confidence
-                raw_results = self.model.predict(
-                    source=img_bgr,
-                    imgsz=self.imgsz,
-                    conf=0.001,
-                    verbose=False
-                )[0]
-                raw_boxes = raw_results.boxes
-                raw_detection_count = len(raw_boxes)
-                raw_max_confidence = float(raw_boxes.conf.max().item()) if raw_detection_count > 0 else 0.0
+                # Perform raw debug prediction at conf=0.001 to get max raw confidence only if debug is set
+                debug_inference = os.getenv("DEBUG_INFERENCE", "false").lower() == "true"
+                if debug_inference:
+                    raw_results = self.model.predict(
+                        source=img_bgr,
+                        imgsz=self.imgsz,
+                        conf=0.001,
+                        device=DEVICE,
+                        verbose=False
+                    )[0]
+                    raw_boxes = raw_results.boxes
+                    raw_detection_count = len(raw_boxes)
+                    raw_max_confidence = float(raw_boxes.conf.max().item()) if raw_detection_count > 0 else 0.0
+                else:
+                    raw_detection_count = 0
+                    raw_max_confidence = 0.0
                 
                 # Perform production prediction at conf=0.25, iou=0.45
                 prod_results = self.model.predict(
@@ -270,14 +336,14 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
                     imgsz=self.imgsz,
                     conf=conf_thresh,
                     iou=iou_thresh,
+                    device=DEVICE,
                     verbose=False
                 )[0]
                 prod_boxes = prod_results.boxes
                 production_detection_count = len(prod_boxes)
                 production_max_confidence = float(prod_boxes.conf.max().item()) if production_detection_count > 0 else 0.0
                 
-                # Log stats exactly as requested
-                if self.disease_id == "bone_fracture":
+                if self.disease_id == "bone_fracture" and debug_inference:
                     print("\n[Fracture Debug]")
                     print(f"raw detections: {raw_detection_count}")
                     print(f"raw max confidence: {raw_max_confidence:.4f}")
@@ -293,7 +359,7 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
                     xyxy = prod_boxes.xyxy[i].cpu().numpy()
                     x1, y1, x2, y2 = xyxy
                     
-                    # Convert absolute bounding boxes [x1, y1, x2, y2] to relative percentages for React CSS layout
+                    # Convert absolute bounding boxes [x1, y1, x2, y2] to relative percentages
                     x_pct = float(x1 / w) * 100
                     y_pct = float(y1 / h) * 100
                     w_pct = float((x2 - x1) / w) * 100
@@ -325,10 +391,8 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
                     })
                 
                 if len(detections) > 0:
-                    # Sort by confidence descending
                     detections.sort(key=lambda x: x["confidence"], reverse=True)
                     has_detection = True
-                    # Keep track of top box coordinates for the heatmap overlay
                     top_idx = int(torch.argmax(prod_boxes.conf).item())
                     xyxy_top = prod_boxes.xyxy[top_idx].cpu().numpy()
             except Exception as e:
@@ -341,7 +405,6 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
         heatmap_np = np.zeros((img_h, img_w), dtype=np.float32)
         
         if has_detection and xyxy_top is not None:
-            # Generate a 2D Gaussian around the top detected bounding box center representing the heatmap
             x1, y1, x2, y2 = xyxy_top
             cx = int((x1 + x2) / 2)
             cy = int((y1 + y2) / 2)
@@ -394,6 +457,7 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
             },
             "inference_time_ms": processing_time_ms
         }
+
 
 
 # ─── Individual Models implementing wrapper patterns ──────────
