@@ -3,10 +3,27 @@ import { Link } from 'react-router-dom';
 import {
   Activity, Brain, Upload, MessageSquare, Stethoscope,
   CheckCircle2, ArrowRight, Star, Shield, Zap, Heart,
-  ChevronRight,
+  ChevronRight, Phone, Linkedin, UserCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+
+const landingTeam = [
+  {
+    name: "Saumya Srivastava",
+    role: "Lead AI Engineer & Full-Stack Architect",
+    phone: "+91 9026348598",
+    linkedin: "https://www.linkedin.com/in/saumsriv/?skipRedirect=true",
+  },
+  {
+    name: "Priyanshu Mishra",
+    role: "Co-Founder & Product Architect",
+  },
+  {
+    name: "Rajneesh Kumar",
+    role: "Core AI Developer & System Integrator",
+  },
+];
 
 const fadeUp = {
   hidden: { opacity: 0, y: 40 },
@@ -287,6 +304,64 @@ export default function Landing() {
                         <p className="font-semibold text-sm">{t.name}</p>
                         <p className="text-muted-foreground text-xs">{t.role} · {t.location}</p>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ─── MEET THE TEAM ─── */}
+      <section className="py-24 bg-muted/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <motion.div
+            variants={fadeUp} initial="hidden" whileInView="visible" viewport={{ once: true }}
+            className="text-center mb-16"
+          >
+            <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">Core Contributors</span>
+            <h2 className="text-4xl font-bold mb-4">Meet the <span className="gradient-text">Jeevansh AI</span> Team</h2>
+            <p className="text-muted-foreground text-lg max-w-xl mx-auto">The developers and co-founders working to advance clinical radiograph scanning.</p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {landingTeam.map((member, i) => (
+              <motion.div key={member.name} variants={fadeUp} custom={i} initial="hidden" whileInView="visible" viewport={{ once: true }}>
+                <Card className="medical-card h-full overflow-hidden bg-card/60 backdrop-blur-xl">
+                  <CardContent className="p-6 flex flex-col items-center text-center space-y-6">
+                    {/* Holographic Avatar */}
+                    <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-medical-blue/20 via-medical-cyan/20 to-primary/10 border-2 border-primary/20 flex items-center justify-center relative shadow-inner">
+                      <span className="text-2xl font-black text-primary leading-none">
+                        {member.name.split(" ").map(w => w[0]).join("")}
+                      </span>
+                      <div className="absolute -inset-1 rounded-full border border-primary/20 animate-pulse pointer-events-none" />
+                    </div>
+
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-bold text-foreground">{member.name}</h3>
+                      <p className="text-xs text-primary font-bold uppercase tracking-wider">{member.role}</p>
+                    </div>
+
+                    <div className="space-y-2 w-full pt-4 border-t border-border flex flex-col items-center">
+                      {member.phone && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Phone className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>{member.phone}</span>
+                        </div>
+                      )}
+                      {member.linkedin && (
+                        <a href={member.linkedin} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-semibold">
+                          <Linkedin className="w-3.5 h-3.5 text-primary" />
+                          <span>LinkedIn Profile</span>
+                        </a>
+                      )}
+                      {!member.phone && !member.linkedin && (
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground opacity-60">
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Core Contributor</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

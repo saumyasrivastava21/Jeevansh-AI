@@ -10,6 +10,8 @@ import {
   Loader2,
   FileText,
 } from "lucide-react";
+import { useToast } from "@/contexts/ToastContext";
+import { downloadReportPdf } from "@/utils/pdf";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -48,6 +50,7 @@ const severityConfig = {
 };
 
 export default function XRayResult() {
+  const { toast } = useToast();
   const location = useLocation();
   const initialReport = location.state?.report;
 
@@ -55,7 +58,7 @@ export default function XRayResult() {
   const [zoom, setZoom] = useState(false);
   const [reportData, setReportData] = useState(initialReport);
   const [initialLoading, setInitialLoading] = useState(!initialReport);
-  const [initialError, setInitialError] = useState(null);
+  const [initialError, setInitialError] = useState<string | null>(null);
   const [isTimeout, setIsTimeout] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -88,7 +91,7 @@ export default function XRayResult() {
         } else {
           setInitialError("Failed to fetch report from backend");
         }
-      } catch (err) {
+      } catch (err: any) {
         setInitialError(err.message || "Network error loading report");
       } finally {
         setInitialLoading(false);
@@ -164,37 +167,13 @@ export default function XRayResult() {
 
   const handleDownloadPdf = async () => {
     setDownloading(true);
-    try {
-      const token = localStorage.getItem('jeevansh_token');
-      const response = await fetch(`http://localhost:5000/api/reports/${report._id}/download`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (!response.ok) {
-        alert("Failed to download PDF report");
-        return;
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Jeevansh-AI-Report-${report._id}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("PDF download failed", error);
-      alert("An error occurred while downloading the report PDF");
-    } finally {
-      setDownloading(false);
-    }
+    await downloadReportPdf(report._id, toast);
+    setDownloading(false);
   };
 
   const handleRegenerate = async () => {
     try {
-      setReportData(prev => prev ? { ...prev, reportStatus: "generating" } : prev);
+      setReportData((prev: any) => prev ? { ...prev, reportStatus: "generating" } : prev);
       setIsTimeout(false);
       const token = localStorage.getItem('jeevansh_token');
       const response = await fetch(`http://localhost:5000/api/reports/${report._id}/regenerate`, {
@@ -207,14 +186,28 @@ export default function XRayResult() {
         const apiRes = await response.json();
         if (apiRes.success && apiRes.data) {
           setReportData(apiRes.data);
+          toast({
+            title: "Success",
+            description: "Report regeneration started successfully.",
+            variant: "success",
+          });
         }
       } else {
-        alert("Regeneration failed");
-        setReportData(prev => prev ? { ...prev, reportStatus: "failed" } : prev);
+        toast({
+          title: "Regeneration Failed",
+          description: "Could not regenerate the report. Please try again later.",
+          variant: "destructive",
+        });
+        setReportData((prev: any) => prev ? { ...prev, reportStatus: "failed" } : prev);
       }
     } catch (err) {
       console.error("Regeneration request failed:", err);
-      setReportData(prev => prev ? { ...prev, reportStatus: "failed" } : prev);
+      toast({
+        title: "Regeneration Error",
+        description: "An error occurred while connecting to the server.",
+        variant: "destructive",
+      });
+      setReportData((prev: any) => prev ? { ...prev, reportStatus: "failed" } : prev);
     }
   };
 

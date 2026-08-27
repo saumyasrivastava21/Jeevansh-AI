@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Moon, Sun, Search, Menu } from 'lucide-react';
+import { Bell, Moon, Sun, Search, Menu, Upload } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -61,6 +61,21 @@ export default function TopNavbar({ title = 'Dashboard', subtitle }: TopNavbarPr
             3
           </Badge>
         </div>
+
+        {/* Upload Button */}
+        {user?.role === 'patient' && (
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              onClick={() => navigate('/dashboard/upload')}
+              variant="medical"
+              size="sm"
+              className="hidden sm:flex rounded-xl mr-1 gap-1.5"
+            >
+              <Upload className="w-4 h-4" />
+              Upload X-Ray
+            </Button>
+          </motion.div>
+        )}
 
         {/* User menu */}
         <DropdownMenu>
