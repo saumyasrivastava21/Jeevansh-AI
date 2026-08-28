@@ -70,6 +70,7 @@ async def predict_disease(disease_type: str, image: UploadFile = File(...), expl
             disease_name=result["disease_name"],
             task_type=result["task_type"],
             has_finding=result["has_finding"],
+            has_malignant_finding=result.get("has_malignant_finding"),
             prediction=PredictionLabel(
                 label=result["prediction"]["label"],
                 confidence=result["prediction"]["confidence"],

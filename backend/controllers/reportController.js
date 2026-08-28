@@ -34,11 +34,34 @@ const createReport = async (req, res, next) => {
       });
     }
 
-    // Determine severity from model-driven findings and confidence
+    // Determine severity from model-driven findings, disease type, and confidence
+    const confVal = aiResult.confidence || (aiResult.prediction ? aiResult.prediction.confidence : 0.0) || 0.0;
+    const diseaseKey = (aiResult.disease_id || "").toLowerCase().replace(/_/g, "-");
+    const predLabel = aiResult.prediction ? (aiResult.prediction.label || aiResult.prediction) : "";
+    
     let severity = "low";
-    if (aiResult.has_finding) {
-      const confVal = aiResult.confidence || 0.0;
-      severity = confVal > 0.85 ? "high" : "medium";
+
+    if (diseaseKey.includes("skin")) {
+      const isMalignant = ["Melanoma", "Basal_Cell_Carcinoma", "Actinic_Keratoses"].includes(predLabel);
+      if (isMalignant) {
+        severity = confVal > 0.70 ? "high" : "medium";
+      } else if (predLabel) {
+        // Identified skin lesion (Melanocytic Nevi, Benign Keratosis, Dermatofibroma, Vascular Lesion)
+        severity = "medium";
+      }
+    } else if (diseaseKey.includes("pneumonia")) {
+      if (predLabel === "PNEUMONIA") {
+        severity = confVal > 0.85 ? "high" : "medium";
+      } else {
+        severity = "low";
+      }
+    } else {
+      // Detection models (Brain Tumor, Bone Fracture)
+      if (aiResult.has_finding) {
+        severity = confVal > 0.85 ? "high" : "medium";
+      } else {
+        severity = "low";
+      }
     }
 
     // Standard medical recommendation mappings
@@ -52,7 +75,6 @@ const createReport = async (req, res, next) => {
     // Construct image static server link
     const imageUrl = `/uploads/${req.file.filename}`;
 
-    // Create Report Document with status "generating" for the LLM part
     const report = new Report({
       patientId: req.user._id,
       patientName: req.user.name,
@@ -61,6 +83,7 @@ const createReport = async (req, res, next) => {
       diseaseName: aiResult.disease_name,
       imageUrl,
       hasFinding: aiResult.has_finding,
+      hasMalignantFinding: aiResult.has_malignant_finding !== undefined ? aiResult.has_malignant_finding : aiResult.has_finding,
       prediction: aiResult.prediction ? aiResult.prediction.label : null,
       confidence: aiResult.confidence ? Math.round(aiResult.confidence * 100) : null,
       severity,

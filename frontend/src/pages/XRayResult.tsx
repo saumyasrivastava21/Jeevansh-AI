@@ -254,7 +254,10 @@ export default function XRayResult() {
 
   const getScanImageSrc = () => {
     if (heatmap && report.heatmapImage) {
-      return `data:image/jpeg;base64,${report.heatmapImage}`;
+      // Backend now returns full data URI (data:image/jpeg;base64,...)
+      // Guard against double-prefixing if an older record stored raw base64
+      const h = report.heatmapImage as string;
+      return h.startsWith('data:') ? h : `data:image/jpeg;base64,${h}`;
     }
     if (!report.imageUrl) {
       return "/images/diseases/pneumonia.png";
@@ -445,7 +448,20 @@ export default function XRayResult() {
                     {sev.label}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {report.hasFinding ? `${report.diseaseName} detected` : `No ${report.diseaseName.toLowerCase()} detected`}
+                    {report.taskType === "classification"
+                      ? (
+                          // Classification models always have a prediction label — show it
+                          // Do NOT conflate hasFinding (malignant-only flag) with "no result"
+                          report.prediction
+                            ? `Prediction: ${report.prediction.replace(/_/g, " ")}`
+                            : `${report.diseaseName} analysis complete`
+                        )
+                      : (
+                          report.hasFinding
+                            ? `${report.diseaseName} detected`
+                            : `No ${report.diseaseName.toLowerCase()} detected`
+                        )
+                    }
                   </p>
                 </div>
               </CardContent>

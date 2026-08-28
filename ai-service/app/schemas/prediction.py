@@ -41,6 +41,7 @@ class PredictionResponse(BaseModel):
     disease_name: str
     task_type: str
     has_finding: bool
+    has_malignant_finding: Optional[bool] = None
     prediction: Optional[PredictionLabel] = None
     confidence: Optional[float] = None
     probabilities: Optional[Dict[str, float]] = None

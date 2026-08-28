@@ -26,6 +26,7 @@ router.post("/message", protect, async (req, res, next) => {
     const client = new OpenAI({
       baseURL: NVIDIA_BASE_URL,
       apiKey: NVIDIA_API_KEY,
+      timeout: 30000,
     });
 
     // Build conversation history
@@ -37,9 +38,11 @@ router.post("/message", protect, async (req, res, next) => {
 
     const conversationMessages = [systemMessage];
 
-    // Append prior conversation history if provided (up to last 10 exchanges)
+    const NVIDIA_FALLBACK_MODEL = process.env.NVIDIA_FALLBACK_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+
+    // Append prior conversation history if provided (up to last 12 messages)
     if (Array.isArray(history)) {
-      const trimmedHistory = history.slice(-20); // max 10 exchanges (20 messages)
+      const trimmedHistory = history.slice(-12); // max 12 messages
       for (const msg of trimmedHistory) {
         if (msg.role === "user" || msg.role === "assistant") {
           conversationMessages.push({ role: msg.role, content: msg.content });
@@ -50,13 +53,29 @@ router.post("/message", protect, async (req, res, next) => {
     // Append current user message
     conversationMessages.push({ role: "user", content: message.trim() });
 
-    const completion = await client.chat.completions.create({
-      model: NVIDIA_MODEL,
-      messages: conversationMessages,
-      temperature: 0.6,
-      top_p: 0.9,
-      max_tokens: 1024,
-    });
+    let completion;
+    try {
+      completion = await client.chat.completions.create({
+        model: NVIDIA_MODEL,
+        messages: conversationMessages,
+        temperature: 0.6,
+        top_p: 0.9,
+        max_tokens: 1024,
+      });
+    } catch (err) {
+      if (err.status === 404 || err.message?.includes("404")) {
+        console.warn(`[Chatbot] Model ${NVIDIA_MODEL} returned 404. Attempting fallback to ${NVIDIA_FALLBACK_MODEL}...`);
+        completion = await client.chat.completions.create({
+          model: NVIDIA_FALLBACK_MODEL,
+          messages: conversationMessages,
+          temperature: 0.6,
+          top_p: 0.9,
+          max_tokens: 1024,
+        });
+      } else {
+        throw err;
+      }
+    }
 
     const reply = completion.choices?.[0]?.message?.content;
 

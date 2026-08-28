@@ -27,13 +27,18 @@ async def generate_report(request: MedicalReportRequest):
         response = report_service.generate_report(request)
         
         if not response["success"]:
-            # Raise descriptive HTTP exceptions based on service errors
             err_code = response.get("error")
             msg = response.get("message", "Generation failed")
             
             if err_code == "REPORT_VALIDATION_FAILED":
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=msg)
-            elif err_code == "MALFORMED_JSON":
+            elif err_code == "NVIDIA_AUTH_ERROR":
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=msg)
+            elif err_code == "NVIDIA_RATE_LIMIT":
+                raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=msg)
+            elif err_code == "NVIDIA_TIMEOUT":
+                raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=msg)
+            elif err_code in ["NVIDIA_CONNECTION_ERROR", "NVIDIA_MODEL_NOT_FOUND", "NVIDIA_API_ERROR", "MALFORMED_JSON"]:
                 raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=msg)
             else:
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg)

@@ -25,18 +25,35 @@ class ReportService:
             return response
         except ValueError as ve:
             logger.error(f"[Report Service] Controlled ValueError during generation: {str(ve)}")
-            if str(ve) == "REPORT_VALIDATION_FAILED":
+            err_str = str(ve)
+            
+            if "NVIDIA_AUTH_ERROR" in err_str:
+                err_code = "NVIDIA_AUTH_ERROR"
+            elif "NVIDIA_RATE_LIMIT" in err_str:
+                err_code = "NVIDIA_RATE_LIMIT"
+            elif "NVIDIA_TIMEOUT" in err_str:
+                err_code = "NVIDIA_TIMEOUT"
+            elif "NVIDIA_CONNECTION_ERROR" in err_str:
+                err_code = "NVIDIA_CONNECTION_ERROR"
+            elif "NVIDIA_MODEL_NOT_FOUND" in err_str:
+                err_code = "NVIDIA_MODEL_NOT_FOUND"
+            elif "NVIDIA_API_ERROR" in err_str:
+                err_code = "NVIDIA_API_ERROR"
+            elif err_str == "REPORT_VALIDATION_FAILED":
                 return {
                     "success": False,
                     "validationPassed": False,
                     "error": "REPORT_VALIDATION_FAILED",
                     "message": "Generated report failed clinical safety validator guidelines."
                 }
+            else:
+                err_code = "MALFORMED_JSON"
+                
             return {
                 "success": False,
                 "validationPassed": False,
-                "error": "MALFORMED_JSON",
-                "message": str(ve)
+                "error": err_code,
+                "message": err_str
             }
         except Exception as e:
             logger.critical(f"[Report Service] Exception calling NVIDIA LLM: {str(e)}")

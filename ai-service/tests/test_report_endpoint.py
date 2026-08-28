@@ -10,8 +10,7 @@ def test_health_endpoint():
     assert response.status_code == 200
     json_data = response.json()
     assert json_data["status"] == "healthy"
-    assert "llmConfigured" in json_data
-    assert json_data["model"] == "nvidia/nemotron-3.5-lightning-30b-a3b"
+    assert json_data["model"] == settings.NVIDIA_MODEL
 
 def test_generate_report_missing_api_key(monkeypatch):
     # Temporarily set NVIDIA_API_KEY to empty

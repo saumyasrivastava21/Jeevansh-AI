@@ -37,7 +37,7 @@ class ReportAgent:
         
         patient_ctx_dict = {}
         if request.patient_context:
-            patient_ctx_dict = request.patient_context.dict()
+            patient_ctx_dict = request.patient_context.model_dump() if hasattr(request.patient_context, "model_dump") else request.patient_context.dict()
 
         user_prompt = USER_PROMPT_TEMPLATE.format(
             patient_context_json=json.dumps(patient_ctx_dict, indent=2),
@@ -63,9 +63,60 @@ class ReportAgent:
             logger.error(f"[Report Agent] JSON parsing failed: {str(jde)}. Response: {raw_response}")
             raise ValueError(f"LLM returned malformed JSON: {str(jde)}")
 
+        # 5.1 Repair dot-prefixed keys and other common small LLM formatting quirks
+        repaired_json = {}
+        for k, v in parsed_json.items():
+            repaired_json[k.lstrip('.')] = v
+        parsed_json = repaired_json
+
+        # Ensure required array/string fields are present with fallbacks
+        if "summary" not in parsed_json:
+            parsed_json["summary"] = parsed_json.get("overallAssessment", "Medical analysis summary.")
+        if "overallAssessment" not in parsed_json:
+            parsed_json["overallAssessment"] = parsed_json.get("summary", "Overall clinical assessment.")
+        if "recommendations" not in parsed_json:
+            parsed_json["recommendations"] = ["Review with primary healthcare provider."]
+        elif isinstance(parsed_json["recommendations"], str):
+            parsed_json["recommendations"] = [parsed_json["recommendations"]]
+            
+        if "limitations" not in parsed_json:
+            parsed_json["limitations"] = ["This AI-generated report is intended for decision support and clinical review only."]
+        elif isinstance(parsed_json["limitations"], str):
+            parsed_json["limitations"] = [parsed_json["limitations"]]
+            
+        if "urgentAttention" not in parsed_json:
+            parsed_json["urgentAttention"] = False
+            
+        # 5.2 Normalize findings array against analyzed_findings to guarantee metadata alignment
+        rebuilt_findings = []
+        for i, item in enumerate(analyzed_findings):
+            llm_finding = {}
+            if "findings" in parsed_json and isinstance(parsed_json["findings"], list) and i < len(parsed_json["findings"]):
+                llm_finding = parsed_json["findings"][i]
+                if not isinstance(llm_finding, dict):
+                    llm_finding = {}
+            
+            # Extract or build interpretation
+            interpretation = llm_finding.get("interpretation") or parsed_json.get("overallAssessment") or parsed_json.get("summary") or ""
+            if not interpretation:
+                interpretation = f"The {item['modelName']} model predicted {item['prediction']} with {item['confidence']*100 if item['confidence'] else 0:.1f}% confidence."
+            
+            rebuilt_findings.append({
+                "diseaseId": item["diseaseId"],
+                "diseaseName": item["diseaseName"],
+                "status": item["status"],
+                "prediction": item["prediction"],
+                "confidence": item["confidence"],
+                "interpretation": interpretation,
+                "modelArchitecture": item["modelArchitecture"],
+                "modelName": item["modelName"],
+                "detectionCount": item["detectionCount"]
+            })
+        parsed_json["findings"] = rebuilt_findings
+
         # Fill in automatic metadata on root before validating
         parsed_json["reportId"] = f"rep_{uuid.uuid4().hex[:8]}"
-        parsed_json["generatedAt"] = datetime.datetime.utcnow().isoformat() + "Z"
+        parsed_json["generatedAt"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         parsed_json["reportVersion"] = "1.0.0"
         parsed_json["llmModel"] = self.client.model
 

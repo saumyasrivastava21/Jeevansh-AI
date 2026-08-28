@@ -207,13 +207,19 @@ class MobileNetV3ModelWrapper(BaseMedicalModelWrapper):
             
         processing_time_ms = float((time.time() - start_time) * 1000)
         
-        # Determine has_finding dynamically
+        # has_finding: True when the model produced a valid classification/detection result.
+        # For classification models, the model ALWAYS predicts a class — has_finding=True means
+        # "the scan was analyzed and a prediction is available" NOT "disease is present".
+        # has_malignant_finding tracks whether the predicted class is a clinically concerning class.
         if self.disease_id == "pneumonia":
-            has_finding = (winning_label == "PNEUMONIA")
+            has_finding = True  # Model always classifies as PNEUMONIA or NORMAL
+            has_malignant_finding = (winning_label == "PNEUMONIA")
         elif self.disease_id == "skin_cancer":
-            has_finding = (winning_label in ["Melanoma", "Basal_Cell_Carcinoma", "Actinic_Keratoses"])
+            has_finding = True  # Model always classifies into one of 7 classes
+            has_malignant_finding = (winning_label in ["Melanoma", "Basal_Cell_Carcinoma", "Actinic_Keratoses"])
         else:
             has_finding = False
+            has_malignant_finding = False
             
         return {
             "success": True,
@@ -222,6 +228,7 @@ class MobileNetV3ModelWrapper(BaseMedicalModelWrapper):
             "disease_name": self.disease_name,
             "task_type": "classification",
             "has_finding": has_finding,
+            "has_malignant_finding": has_malignant_finding,
             "prediction": {
                 "label": winning_label,
                 "confidence": winning_confidence,
@@ -440,6 +447,7 @@ class YOLOModelWrapper(BaseMedicalModelWrapper):
             "disease_name": self.disease_name,
             "task_type": "detection",
             "has_finding": has_finding,
+            "has_malignant_finding": has_finding,
             "prediction": prediction_label,
             "confidence": winning_confidence,
             "probabilities": None,
@@ -476,8 +484,8 @@ class SkinCancerModel(MobileNetV3ModelWrapper):
             fc_features=512
         )
         
-    def predict(self, image_bytes: bytes) -> Dict[str, Any]:
-        res = super().predict(image_bytes)
+    def predict(self, image_bytes: bytes, explain: bool = False) -> Dict[str, Any]:
+        res = super().predict(image_bytes, explain=explain)
         pred = res["prediction"]["label"]
         res["findings"] = [
             f"Dermatoscopy feature extraction identified primary indicators corresponding to '{pred.replace('_', ' ')}' characteristics.",
@@ -501,8 +509,8 @@ class PneumoniaModel(MobileNetV3ModelWrapper):
             fc_features=1280
         )
         
-    def predict(self, image_bytes: bytes) -> Dict[str, Any]:
-        res = super().predict(image_bytes)
+    def predict(self, image_bytes: bytes, explain: bool = False) -> Dict[str, Any]:
+        res = super().predict(image_bytes, explain=explain)
         pred = res["prediction"]["label"]
         
         if pred == "PNEUMONIA":
@@ -532,8 +540,8 @@ class BrainTumorModel(YOLOModelWrapper):
             imgsz=640
         )
         
-    def predict(self, image_bytes: bytes) -> Dict[str, Any]:
-        res = super().predict(image_bytes)
+    def predict(self, image_bytes: bytes, explain: bool = False) -> Dict[str, Any]:
+        res = super().predict(image_bytes, explain=explain)
         pred = res["prediction"]["label"] if res["prediction"] else self.normal_class
         
         if pred == "brain_tumor":
@@ -563,8 +571,8 @@ class FractureModel(YOLOModelWrapper):
             imgsz=1024
         )
         
-    def predict(self, image_bytes: bytes) -> Dict[str, Any]:
-        res = super().predict(image_bytes)
+    def predict(self, image_bytes: bytes, explain: bool = False) -> Dict[str, Any]:
+        res = super().predict(image_bytes, explain=explain)
         pred = res["prediction"]["label"] if res["prediction"] else self.normal_class
         
         if pred == "fracture":

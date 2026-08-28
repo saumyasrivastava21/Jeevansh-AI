@@ -97,7 +97,7 @@ def test_report_agent_fails_safety_check(mock_nvidia_client, request_payload):
                 "detectionCount": 1
             }
         ],
-        "overallAssessment": "Signs consistent with bone fracture.",
+        "overallAssessment": "This confirms a definitive diagnosis of bone fracture. Prescribe 400mg of ibuprofen.",
         "recommendations": ["Follow up with specialist."],
         "limitations": ["Clinical review required."],
         "urgentAttention": True,

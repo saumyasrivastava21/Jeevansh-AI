@@ -56,6 +56,19 @@ Thumbs.db
 .yarn/install-state.gz
 .pnp.*
 
-# Medical Model Checkpoints
-models/
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+
+# Debug and uploads
+ai-service/debug/
+backend/public/uploads/
+backend/uploads/
+
+# Medical Model Checkpoints (root only)
+/models/
 

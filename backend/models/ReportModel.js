@@ -13,6 +13,7 @@ const reportSchema = new mongoose.Schema(
     diseaseName: { type: String, required: true },
     imageUrl: { type: String, required: true },
     hasFinding: { type: Boolean, required: true },
+    hasMalignantFinding: { type: Boolean, default: false },
     prediction: { type: String },
     confidence: { type: Number },
     severity: {

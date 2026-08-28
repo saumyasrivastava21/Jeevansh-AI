@@ -1,6 +1,20 @@
 const fs = require("fs");
 const path = require("path");
 
+/** Helper: create a fetch with AbortController timeout */
+function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal })
+    .catch(err => {
+      if (err.name === 'AbortError') {
+        throw new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
+      }
+      throw err;
+    })
+    .finally(() => clearTimeout(timer));
+}
+
 /**
  * Forwards an uploaded local image file to the FastAPI microservice for AI prediction.
  * @param {string} filePath - Absolute path to the saved local image file.
@@ -22,10 +36,10 @@ async function predictDisease(filePath, diseaseType) {
   
   console.log(`[AI-Service Client] Routing image to FastAPI endpoint: ${endpoint}`);
   
-  const response = await fetch(endpoint, {
+  const response = await fetchWithTimeout(endpoint, {
     method: "POST",
     body: formData,
-  });
+  }, 60000); // 60s timeout — accommodates cold-start model loading
   
   if (!response.ok) {
     const errorText = await response.text();
@@ -55,10 +69,10 @@ async function getGradcamHeatmap(filePath, diseaseType) {
   
   console.log(`[AI-Service Client] Routing explainability to FastAPI endpoint: ${endpoint}`);
   
-  const response = await fetch(endpoint, {
+  const response = await fetchWithTimeout(endpoint, {
     method: "POST",
     body: formData,
-  });
+  }, 30000); // 30s timeout for Grad-CAM
   
   if (!response.ok) {
     const errorText = await response.text();
@@ -86,13 +100,13 @@ async function generateMedicalReport(predictions, patientContext) {
     predictions: predictions
   };
 
-  const response = await fetch(endpoint, {
+  const response = await fetchWithTimeout(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
     },
     body: JSON.stringify(payload)
-  });
+  }, 90000); // 90s timeout — NVIDIA LLM can be slow
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -104,3 +118,4 @@ async function generateMedicalReport(predictions, patientContext) {
 }
 
 module.exports = { predictDisease, generateMedicalReport, getGradcamHeatmap };
+
