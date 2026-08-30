@@ -19,6 +19,7 @@ export default function Register() {
   const [role, setRole] = useState<UserRole>('patient');
   const [showPassword, setShowPassword] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', address: '', password: '' });
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const { register, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -30,12 +31,50 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return; }
+
+    const password = form.password;
+
+    // 1. Minimum 8 characters
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+    // 2. At least 1 uppercase letter (A-Z)
+    if (!/[A-Z]/.test(password)) {
+      setError('Password must contain at least one uppercase letter (A-Z).');
+      return;
+    }
+    // 3. At least 1 lowercase letter (a-z)
+    if (!/[a-z]/.test(password)) {
+      setError('Password must contain at least one lowercase letter (a-z).');
+      return;
+    }
+    // 4. At least 1 digit (0-9)
+    if (!/\d/.test(password)) {
+      setError('Password must contain at least one digit (0-9).');
+      return;
+    }
+    // 5. At least 1 special character (@, #, $, %, etc.)
+    if (!/[^A-Za-z0-9\s]/.test(password)) {
+      setError('Password must contain at least one special character (e.g. @, #, $, %).');
+      return;
+    }
+    // 6. No spaces
+    if (/\s/.test(password)) {
+      setError('Password must not contain spaces.');
+      return;
+    }
+    // 7. Confirm password should match the password
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
     try {
       await register({ ...form, role });
       navigate('/dashboard');
-    } catch {
-      setError('Registration failed. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please try again.');
     }
   };
 
@@ -82,10 +121,16 @@ export default function Register() {
           <div className="col-span-2">
             <Label htmlFor="reg-password">Password</Label>
             <div className="relative mt-1.5">
-              <Input id="reg-password" type={showPassword ? 'text' : 'password'} className="h-10 pr-10" placeholder="Min. 6 characters" value={form.password} onChange={handleChange('password')} required />
+              <Input id="reg-password" type={showPassword ? 'text' : 'password'} className="h-10 pr-10" placeholder="Min. 8 characters with A-Z, a-z, 0-9, special char" value={form.password} onChange={handleChange('password')} required />
               <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
+            </div>
+          </div>
+          <div className="col-span-2">
+            <Label htmlFor="confirm-password">Confirm Password</Label>
+            <div className="relative mt-1.5">
+              <Input id="confirm-password" type={showPassword ? 'text' : 'password'} className="h-10 pr-10" placeholder="Confirm your password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required />
             </div>
           </div>
         </div>
