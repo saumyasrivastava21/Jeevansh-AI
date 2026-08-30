@@ -38,7 +38,6 @@ export default function App() {
         <Route path="/diseases/:id" element={<DiseaseDetail />} />
         <Route path="/find-doctors" element={<FindDoctors />} />
         <Route path="/tutorial" element={<Tutorial />} />
-        <Route path="/community" element={<Community />} />
         <Route path="/team" element={<Team />} />
       </Route>
 
@@ -57,6 +56,7 @@ export default function App() {
         <Route path="/profile" element={<Settings />} />
         <Route path="/result" element={<XRayResult />} />
         <Route path="/chatbot" element={<Chatbot />} />
+        <Route path="/community" element={<Community />} />
         <Route path="/doctor" element={<ProtectedRoute allowedRoles={['doctor', 'admin']}><DoctorPortal /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminPanel /></ProtectedRoute>} />
       </Route>

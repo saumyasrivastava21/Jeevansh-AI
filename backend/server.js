@@ -1,4 +1,6 @@
 const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const mongoose = require("mongoose");
@@ -10,16 +12,33 @@ const doctorRoutes = require("./routes/doctorRoutes");
 const diseaseRoutes = require("./routes/diseaseRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
+const communityRoutes = require("./routes/communityRoutes");
 
 // Middleware
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
 
+// Socket manager
+const { initializeSocket } = require("./utils/socketManager");
+
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
+
+// Socket.io with proper CORS
+const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+const io = new Server(server, {
+  cors: {
+    origin: clientUrl,
+    credentials: true,
+  },
+});
+
+// Initialize WebSocket handlers
+initializeSocket(io);
 
 // Middleware config
-app.use(cors());
+app.use(cors({ origin: clientUrl, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // Serve local static uploaded scans
@@ -45,6 +64,7 @@ app.use("/api/doctors", doctorRoutes);
 app.use("/api/diseases", diseaseRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/community", communityRoutes);
 
 app.get("/", (req, res) => {
   res.send("API is running...");
@@ -56,7 +76,7 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(
     `Server running in ${process.env.NODE_ENV || "development"} mode on port ${PORT}`
   );
