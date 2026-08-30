@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -8,14 +8,19 @@ import {
   Clock,
   TrendingUp,
   Activity,
-  CloudUpload,
-  X,
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Calendar,
+  Sparkles,
+  ArrowRight,
+  Shield,
+  Download,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/contexts/ToastContext";
 import { apiFetch } from "@/lib/api";
+import { downloadReportPdf } from "@/utils/pdf";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -24,13 +29,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -51,126 +49,111 @@ const statusBadgeMap: Record<
   pending: { variant: "pending", label: "Pending" },
 };
 
-const diseases = [
-  { value: "brain-tumor", label: "Brain Tumor" },
-  { value: "pneumonia", label: "Pneumonia" },
-  { value: "bone-fracture", label: "Bone Fracture" },
-  { value: "dental", label: "Dental Caries" },
-  { value: "diabetic-retinopathy", label: "Diabetic Retinopathy" },
-  { value: "skin-cancer", label: "Skin Cancer" },
-  { value: "tuberculosis", label: "Tuberculosis" },
-  { value: "arthritis", label: "Arthritis" },
-  { value: "lung-cancer", label: "Lung Cancer" },
-];
-
-const statsCards = [
-  {
-    label: "Total Reports",
-    value: "12",
-    icon: FileText,
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
-  },
-  {
-    label: "Completed",
-    value: "9",
-    icon: CheckCircle2,
-    color: "text-emerald-500",
-    bg: "bg-emerald-500/10",
-  },
-  {
-    label: "Pending",
-    value: "2",
-    icon: Clock,
-    color: "text-amber-500",
-    bg: "bg-amber-500/10",
-  },
-  {
-    label: "AI Accuracy",
-    value: "94.7%",
-    icon: TrendingUp,
-    color: "text-cyan-500",
-    bg: "bg-cyan-500/10",
-  },
-];
-
 export default function UserDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
-  const [dragging, setDragging] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
-  const [disease, setDisease] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [userReports, setUserReports] = useState<any[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     apiFetch("/reports/myreports")
       .then((res) => {
-        if (res.success) setUserReports(res.data.slice(0, 4));
+        if (res.success) setReports(res.data || []);
       })
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
-  const handleFile = (f: File) => {
-    if (f && f.type.startsWith("image/")) setFile(f);
-  };
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
-  };
+  const recentReports = reports.slice(0, 4);
 
-  const handleAnalyze = async () => {
-    if (!file || !disease) return;
-    setUploading(true);
-    try {
-      await new Promise((r) => setTimeout(r, 1000));
-      // Post to true backend route
-      const res = await apiFetch("/reports", {
-        method: "POST",
-        body: JSON.stringify({
-          disease,
-          diseaseName:
-            diseases.find((d) => d.value === disease)?.label || disease,
-          imageUrl: URL.createObjectURL(file), // Note: using local Object URL for demo since real upload takes s3/cloud
-          confidence: Math.floor(Math.random() * 20) + 80, // 80-99
-          severity: "high", // example mock logic
-          aiFindings: "AI has detected anomalies consistent with the selected disease parameters. Consultation recommended.",
-          recommendation: "Please schedule an appointment with a specialist.",
-          bboxCoords: { x: 40, y: 40, w: 20, h: 20 },
-        }),
-      });
+  // Compute real metrics
+  const totalScans = reports.length;
+  const reportsGenerated = reports.filter((r) => r.reportStatus === "completed").length;
+  const recentFindings = reports.filter((r) => r.hasFinding).length;
+  const lastScanDate =
+    reports.length > 0
+      ? new Date(reports[0].createdAt).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+        })
+      : "N/A";
 
-      if (res.success) {
-        navigate("/result", { state: { report: res.data } });
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setUploading(false);
-    }
-  };
+  const statsCards = [
+    {
+      label: "Total Scans",
+      value: totalScans.toString(),
+      icon: Activity,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+    },
+    {
+      label: "Reports Completed",
+      value: reportsGenerated.toString(),
+      icon: CheckCircle2,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+    },
+    {
+      label: "Recent Findings",
+      value: recentFindings.toString(),
+      icon: AlertCircle,
+      color: "text-red-500",
+      bg: "bg-red-500/10",
+    },
+    {
+      label: "Last Scan Upload",
+      value: lastScanDate,
+      icon: Clock,
+      color: "text-cyan-500",
+      bg: "bg-cyan-500/10",
+    },
+  ];
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Greeting */}
-      <motion.div variants={fadeUp} initial="hidden" animate="visible">
-        <h2 className="text-2xl font-bold">
-          {new Date().getHours() < 12
-            ? "Good morning"
-            : new Date().getHours() < 17
-            ? "Good afternoon"
-            : "Good evening"}
-          , <span className="text-primary">{user?.name?.split(" ")[0]}</span> 👋
-        </h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Here's your health overview for today.
-        </p>
+      {/* Hero Greeting Section */}
+      <motion.div
+        variants={fadeUp}
+        initial="hidden"
+        animate="visible"
+        className="rounded-2xl bg-gradient-to-r from-medical-blue to-primary p-6 md:p-8 text-white relative overflow-hidden shadow-lg border border-white/10"
+      >
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute -top-10 -right-10 w-64 h-64 rounded-full border-2 border-white" />
+        </div>
+        <div className="relative z-10 space-y-4 max-w-2xl">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5 text-medical-cyan animate-pulse" />
+            AI-Powered Medical Scan Analysis
+          </div>
+          <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-none">
+            Welcome back, <span className="text-medical-cyan">{user?.name?.split(" ")[0]}</span> 👋
+          </h2>
+          <p className="text-white/80 text-sm md:text-base leading-relaxed">
+            Diagnose diagnostic images with deep learning model screening and get automatic interpretation reviews.
+          </p>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Button
+              onClick={() => navigate("/dashboard/upload")}
+              className="bg-medical-cyan text-medical-blue hover:bg-medical-cyan/90 font-bold rounded-xl"
+            >
+              <Upload className="w-4 h-4 mr-2" /> Upload New Scan
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="bg-white/5 text-white border-white/20 hover:bg-white/10 backdrop-blur-sm rounded-xl"
+            >
+              <Link to="/chatbot">
+                <MessageSquare className="w-4 h-4 mr-2" /> Talk to AI Assistant
+              </Link>
+            </Button>
+          </div>
+        </div>
       </motion.div>
 
-      {/* Stats cards */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statsCards.map((s, i) => (
           <motion.div
@@ -188,10 +171,14 @@ export default function UserDashboard() {
                   >
                     <s.icon className={`w-5 h-5 ${s.color}`} />
                   </div>
-                  <Activity className="w-4 h-4 text-muted-foreground" />
+                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <p className="text-2xl font-bold">{s.value}</p>
-                <p className="text-xs text-muted-foreground mt-1">{s.label}</p>
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <p className="text-2xl font-black">{s.value}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1 font-medium">{s.label}</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -199,7 +186,7 @@ export default function UserDashboard() {
       </div>
 
       <div className="grid lg:grid-cols-5 gap-6">
-        {/* Upload card */}
+        {/* Quick Actions */}
         <motion.div
           variants={fadeUp}
           custom={4}
@@ -207,117 +194,59 @@ export default function UserDashboard() {
           animate="visible"
           className="lg:col-span-2"
         >
-          <Card className="medical-card h-full">
+          <Card className="medical-card h-full border-primary/10">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
-                <CloudUpload className="w-5 h-5 text-primary" />
-                Upload & Analyze
+                <Shield className="w-5 h-5 text-primary" />
+                Quick Actions
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Drop zone */}
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => inputRef.current?.click()}
-                className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${
-                  dragging
-                    ? "border-primary bg-primary/10 scale-[1.02]"
-                    : file
-                    ? "border-emerald-500 bg-emerald-500/10"
-                    : "border-border hover:border-primary/60 hover:bg-muted/50"
-                }`}
-              >
-                <input
-                  ref={inputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) =>
-                    e.target.files?.[0] && handleFile(e.target.files[0])
-                  }
-                />
-                {file ? (
-                  <div>
-                    <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-                    <p className="text-sm font-medium text-emerald-600 truncate">
-                      {file.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {(file.size / 1024).toFixed(1)} KB
-                    </p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFile(null);
-                      }}
-                      className="absolute top-2 right-2 text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+            <CardContent className="grid grid-cols-1 gap-3 pt-2">
+              {[
+                {
+                  label: "Upload Medical Scan",
+                  desc: "Start an AI screening analysis",
+                  icon: Upload,
+                  to: "/dashboard/upload",
+                  bg: "bg-blue-500/10 text-blue-600 hover:bg-blue-500/20",
+                },
+                {
+                  label: "My Reports History",
+                  desc: "Filter and download past PDFs",
+                  icon: FileText,
+                  to: "/dashboard/reports",
+                  bg: "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
+                },
+                {
+                  label: "Medical AI Assistant",
+                  desc: "Consult our RAG chatbot",
+                  icon: MessageSquare,
+                  to: "/chatbot",
+                  bg: "bg-cyan-500/10 text-cyan-600 hover:bg-cyan-500/20",
+                },
+              ].map((act) => (
+                <Link key={act.label} to={act.to}>
+                  <div
+                    className={`flex items-start gap-4 p-4 rounded-xl border border-border transition-all duration-200 cursor-pointer ${act.bg}`}
+                  >
+                    <div className="p-2 bg-white rounded-lg shadow-sm shrink-0">
+                      <act.icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold flex items-center gap-1">
+                        {act.label}
+                        <ArrowRight className="w-3.5 h-3.5 opacity-60 transition-transform group-hover:translate-x-1" />
+                      </p>
+                      <p className="text-xs opacity-80 mt-0.5">{act.desc}</p>
+                    </div>
                   </div>
-                ) : (
-                  <div>
-                    <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm font-medium">Drop your scan here</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      X-Ray, MRI, CT — PNG, JPG, DICOM
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Disease selector */}
-              <div>
-                <p className="text-sm font-medium mb-1.5">Disease Type</p>
-                <Select value={disease} onValueChange={setDisease}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select disease to analyze..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {diseases.map((d) => (
-                      <SelectItem key={d.value} value={d.value}>
-                        {d.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <Button
-                className="w-full"
-                variant="medical"
-                disabled={!file || !disease || uploading}
-                onClick={handleAnalyze}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Activity className="w-4 h-4 mr-2" />
-                    Analyze with AI
-                  </>
-                )}
-              </Button>
-
-              {(!file || !disease) && (
-                <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-                  <AlertCircle className="w-3 h-3" />
-                  Upload a scan and select disease type to start
-                </p>
-              )}
+                </Link>
+              ))}
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Recent reports */}
+        {/* Recent Reports List */}
         <motion.div
           variants={fadeUp}
           custom={5}
@@ -325,26 +254,45 @@ export default function UserDashboard() {
           animate="visible"
           className="lg:col-span-3"
         >
-          <Card className="medical-card h-full">
+          <Card className="medical-card h-full border-primary/10">
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary" />
                 Recent Reports
               </CardTitle>
-              <Button asChild variant="ghost" size="sm" className="text-xs">
-                <Link to="/dashboard">View all</Link>
-              </Button>
+              {reports.length > 0 && (
+                <Button asChild variant="ghost" size="sm" className="text-xs">
+                  <Link to="/dashboard/reports">View all reports</Link>
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
-              {userReports.length === 0 ? (
-                <div className="py-8 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    No reports generated yet.
-                  </p>
+              {loading ? (
+                <div className="py-12 text-center flex flex-col items-center">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin mb-2" />
+                  <p className="text-xs text-muted-foreground font-semibold">Loading history...</p>
+                </div>
+              ) : reports.length === 0 ? (
+                <div className="py-12 text-center space-y-4">
+                  <FileText className="w-12 h-12 text-muted-foreground mx-auto opacity-50" />
+                  <div className="space-y-1">
+                    <p className="font-bold text-base text-foreground">No scans yet</p>
+                    <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                      Upload your first medical scan to begin AI-assisted analysis and generate clinical PDFs.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => navigate("/dashboard/upload")}
+                    variant="medical"
+                    size="sm"
+                    className="rounded-xl"
+                  >
+                    Upload X-Ray
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {userReports.map((report, i) => {
+                  {recentReports.map((report, i) => {
                     const status =
                       statusBadgeMap[report.status as keyof typeof statusBadgeMap] ||
                       statusBadgeMap.pending;
@@ -356,46 +304,113 @@ export default function UserDashboard() {
                         initial="hidden"
                         animate="visible"
                       >
-                        <Link to="/result" state={{ report }}>
-                          <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer group">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-border hover:bg-muted/30 transition-colors">
+                          <div className="flex items-center gap-3 min-w-0">
                             <img
-                              src={report.imageUrl || "/images/diseases/pneumonia.png"}
+                              src={
+                                report.imageUrl
+                                  ? report.imageUrl.startsWith("http") ||
+                                    report.imageUrl.startsWith("blob:")
+                                    ? report.imageUrl
+                                    : `http://localhost:5000${report.imageUrl}`
+                                  : "/images/diseases/pneumonia.png"
+                              }
                               alt=""
                               className="w-12 h-12 rounded-lg object-cover flex-shrink-0 bg-black"
                             />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold truncate">
+                            <div className="min-w-0 space-y-0.5">
+                              <p className="text-sm font-bold truncate text-foreground">
                                 {report.diseaseName}
                               </p>
-                              <p className="text-xs text-muted-foreground">
-                                {new Date(report.createdAt).toLocaleDateString(
-                                  "en-IN",
-                                  {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                  }
+                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                <Calendar className="w-3 h-3" />
+                                {new Date(report.createdAt).toLocaleDateString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <Badge
+                                  variant={status.variant}
+                                  className="text-[9px] px-1.5 py-0"
+                                >
+                                  {status.label}
+                                </Badge>
+                                {report.prediction && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Prediction:{" "}
+                                    <strong className="text-foreground capitalize">
+                                      {report.prediction.replace(/_/g, " ")}
+                                    </strong>
+                                  </span>
                                 )}
-                              </p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                              <Badge variant={status.variant}>
-                                {status.label}
-                              </Badge>
-                              <span
-                                className={`text-xs font-semibold ${
-                                  report.confidence > 85
-                                    ? "text-emerald-600"
-                                    : report.confidence > 70
-                                    ? "text-amber-600"
-                                    : "text-red-600"
-                                }`}
-                              >
-                                {report.confidence}%
-                              </span>
+                                {report.confidence !== null && report.confidence !== undefined && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Confidence:{" "}
+                                    <strong className="text-foreground">
+                                      {report.confidence}%
+                                    </strong>
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </Link>
+
+                          <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2">
+                            <span className="text-xs">
+                              {report.reportStatus === "completed" ? (
+                                <Badge
+                                  variant="success"
+                                  className="bg-emerald-500/10 text-emerald-500 border-none text-[9px] px-1.5 py-0 font-bold"
+                                >
+                                  AI Report: Completed
+                                </Badge>
+                              ) : report.reportStatus === "generating" ? (
+                                <Badge
+                                  variant="warning"
+                                  className="bg-amber-500/10 text-amber-500 border-none text-[9px] px-1.5 py-0 font-bold animate-pulse"
+                                >
+                                  AI Report: Generating...
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  variant="destructive"
+                                  className="bg-red-500/10 text-red-500 border-none text-[9px] px-1.5 py-0 font-bold"
+                                >
+                                  AI Report: Failed
+                                </Badge>
+                              )}
+                            </span>
+
+                            <div className="flex items-center gap-2 mt-1 w-full sm:w-auto">
+                              <Button
+                                asChild
+                                size="sm"
+                                variant="outline"
+                                className="text-[11px] h-7 px-2.5 rounded-lg"
+                              >
+                                <Link
+                                  to={`/result?reportId=${report._id}`}
+                                  state={{ report }}
+                                >
+                                  View Report
+                                </Link>
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="medical"
+                                className="text-[11px] h-7 px-2.5 rounded-lg gap-1"
+                                disabled={report.reportStatus !== "completed"}
+                                onClick={() => downloadReportPdf(report._id, toast)}
+                              >
+                                <Download className="w-3 h-3" />
+                                PDF
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                       </motion.div>
                     );
                   })}
@@ -405,59 +420,6 @@ export default function UserDashboard() {
           </Card>
         </motion.div>
       </div>
-
-      {/* Quick actions */}
-      <motion.div
-        variants={fadeUp}
-        custom={6}
-        initial="hidden"
-        animate="visible"
-      >
-        <h3 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
-          Quick Actions
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            {
-              label: "AI Chatbot",
-              icon: MessageSquare,
-              to: "/chatbot",
-              color:
-                "bg-cyan-500/10 text-cyan-600 hover:bg-cyan-500/20",
-            },
-            {
-              label: "Find Doctors",
-              icon: Activity,
-              to: "/find-doctors",
-              color:
-                "bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20",
-            },
-            {
-              label: "Disease Info",
-              icon: FileText,
-              to: "/diseases",
-              color:
-                "bg-purple-500/10 text-purple-600 hover:bg-purple-500/20",
-            },
-            {
-              label: "Tutorial",
-              icon: CheckCircle2,
-              to: "/tutorial",
-              color:
-                "bg-amber-500/10 text-amber-600 hover:bg-amber-500/20",
-            },
-          ].map((a) => (
-            <Link key={a.label} to={a.to}>
-              <div
-                className={`flex items-center gap-3 p-4 rounded-xl border border-border transition-all duration-200 cursor-pointer ${a.color}`}
-              >
-                <a.icon className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm font-medium">{a.label}</span>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </motion.div>
     </div>
   );
 }

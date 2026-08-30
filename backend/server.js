@@ -2,12 +2,14 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
 
 // Routes
 const userRoutes = require("./routes/userRoutes");
 const doctorRoutes = require("./routes/doctorRoutes");
 const diseaseRoutes = require("./routes/diseaseRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const chatbotRoutes = require("./routes/chatbotRoutes");
 
 // Middleware
 const { notFound, errorHandler } = require("./middlewares/errorMiddleware");
@@ -19,6 +21,9 @@ const app = express();
 // Middleware config
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+// Serve local static uploaded scans
+app.use("/uploads", express.static(path.join(__dirname, "public/uploads")));
 
 // Database connection
 const connectDB = async () => {
@@ -26,7 +31,7 @@ const connectDB = async () => {
     const conn = await mongoose.connect(
       process.env.MONGO_URI
     );
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    console.log(`MongoDB Connected`);
   } catch (error) {
     console.error(`Error: ${error.message}`);
     process.exit(1);
@@ -39,6 +44,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/doctors", doctorRoutes);
 app.use("/api/diseases", diseaseRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 app.get("/", (req, res) => {
   res.send("API is running...");

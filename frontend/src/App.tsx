@@ -21,6 +21,10 @@ import AdminPanel from '@/pages/AdminPanel';
 import FindDoctors from '@/pages/FindDoctors';
 import Tutorial from '@/pages/Tutorial';
 import Community from '@/pages/Community';
+import XRayUpload from '@/pages/XRayUpload';
+import MyReports from '@/pages/MyReports';
+import Settings from '@/pages/Settings';
+import Team from '@/pages/Team';
 
 export default function App() {
   const { isAuthenticated } = useAuth();
@@ -35,6 +39,7 @@ export default function App() {
         <Route path="/find-doctors" element={<FindDoctors />} />
         <Route path="/tutorial" element={<Tutorial />} />
         <Route path="/community" element={<Community />} />
+        <Route path="/team" element={<Team />} />
       </Route>
 
       {/* Auth routes */}
@@ -46,6 +51,10 @@ export default function App() {
       {/* Protected — all authenticated roles */}
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<UserDashboard />} />
+        <Route path="/dashboard/upload" element={<XRayUpload />} />
+        <Route path="/dashboard/reports" element={<MyReports />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/profile" element={<Settings />} />
         <Route path="/result" element={<XRayResult />} />
         <Route path="/chatbot" element={<Chatbot />} />
         <Route path="/doctor" element={<ProtectedRoute allowedRoles={['doctor', 'admin']}><DoctorPortal /></ProtectedRoute>} />

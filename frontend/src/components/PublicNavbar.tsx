@@ -1,11 +1,11 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Activity, Menu, Moon, Sun, X } from 'lucide-react';
+import { Activity, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import ThemeToggleVoice from './ThemeToggleVoice';
 
 const navLinks = [
   { label: 'Home', to: '/' },
@@ -17,7 +17,6 @@ const navLinks = [
 
 export default function PublicNavbar() {
   const [open, setOpen] = useState(false);
-  const { toggleTheme, isDark } = useTheme();
   const { isAuthenticated } = useAuth();
   const location = useLocation();
 
@@ -55,9 +54,7 @@ export default function PublicNavbar() {
 
         {/* Right */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl">
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </Button>
+          <ThemeToggleVoice />
           {isAuthenticated ? (
             <Button asChild variant="medical" size="sm" className="rounded-xl">
               <Link to="/dashboard">Dashboard</Link>

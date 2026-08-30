@@ -1,9 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Moon, Sun, Search, Menu } from 'lucide-react';
+import { Bell, Moon, Sun, Search, Menu, Upload } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/button';
+import ThemeToggleVoice from './ThemeToggleVoice';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -18,7 +18,6 @@ interface TopNavbarProps {
 
 export default function TopNavbar({ title = 'Dashboard', subtitle }: TopNavbarProps) {
   const { user, logout } = useAuth();
-  const { toggleTheme, isDark } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -46,11 +45,7 @@ export default function TopNavbar({ title = 'Dashboard', subtitle }: TopNavbarPr
       {/* Right: actions */}
       <div className="flex items-center gap-2">
         {/* Dark mode */}
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-          <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-xl">
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </Button>
-        </motion.div>
+        <ThemeToggleVoice />
 
         {/* Notifications */}
         <div className="relative">
@@ -61,6 +56,21 @@ export default function TopNavbar({ title = 'Dashboard', subtitle }: TopNavbarPr
             3
           </Badge>
         </div>
+
+        {/* Upload Button */}
+        {user?.role === 'patient' && (
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button
+              onClick={() => navigate('/dashboard/upload')}
+              variant="medical"
+              size="sm"
+              className="hidden sm:flex rounded-xl mr-1 gap-1.5"
+            >
+              <Upload className="w-4 h-4" />
+              Upload X-Ray
+            </Button>
+          </motion.div>
+        )}
 
         {/* User menu */}
         <DropdownMenu>

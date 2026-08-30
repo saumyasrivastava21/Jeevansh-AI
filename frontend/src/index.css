@@ -56,6 +56,7 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-feature-settings: "cv02","cv03","cv04","cv11";
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   h1,h2,h3,h4,h5,h6 { @apply tracking-tight; }
 }
@@ -139,4 +140,51 @@
   .badge-danger  { @apply bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400; }
   .badge-info    { @apply bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400; }
   .badge-neutral { @apply bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300; }
+}
+
+/* Markdown Content Styling inside Chatbot */
+.markdown-content p {
+  @apply text-sm leading-relaxed mb-3 last:mb-0;
+}
+.markdown-content h1 {
+  @apply text-lg font-black text-foreground mt-4 mb-2;
+}
+.markdown-content h2 {
+  @apply text-base font-bold text-foreground mt-3 mb-1.5;
+}
+.markdown-content h3 {
+  @apply text-sm font-semibold text-foreground mt-2 mb-1;
+}
+.markdown-content ul {
+  @apply list-disc pl-5 mb-3 space-y-1 text-sm text-foreground;
+}
+.markdown-content ol {
+  @apply list-decimal pl-5 mb-3 space-y-1 text-sm text-foreground;
+}
+.markdown-content li {
+  @apply text-sm leading-relaxed;
+}
+.markdown-content strong {
+  @apply font-bold text-foreground;
+}
+.markdown-content em {
+  @apply italic text-muted-foreground;
+}
+.markdown-content code {
+  @apply px-1.5 py-0.5 bg-muted dark:bg-muted/50 rounded-md font-mono text-xs text-primary border border-border/40;
+}
+.markdown-content pre {
+  @apply p-3 bg-muted/60 dark:bg-black/40 rounded-xl border border-border/80 font-mono text-xs overflow-x-auto my-3;
+}
+.markdown-content table {
+  @apply w-full border-collapse border border-border/80 my-3 text-xs text-foreground overflow-hidden rounded-lg;
+}
+.markdown-content th {
+  @apply border border-border bg-muted/80 p-2 font-bold text-left;
+}
+.markdown-content td {
+  @apply border border-border p-2 bg-card;
+}
+.markdown-content blockquote {
+  @apply border-l-4 border-primary/50 pl-3 italic text-muted-foreground my-3;
 }

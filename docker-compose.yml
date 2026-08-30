@@ -1,0 +1,52 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:6.0
+    container_name: jeevansh_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+  ai-service:
+    build: ./ai-service
+    container_name: jeevansh_ai_service
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}
+      - NVIDIA_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: jeevansh_backend
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - MONGO_URI=mongodb://mongodb:27017/jeevansh
+      - JWT_SECRET=supersecretkey12345
+      - AI_SERVICE_URL=http://ai-service:8000
+      - NODE_ENV=development
+    depends_on:
+      - mongodb
+      - ai-service
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: jeevansh_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
