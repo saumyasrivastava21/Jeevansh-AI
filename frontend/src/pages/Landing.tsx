@@ -12,13 +12,13 @@ import AI3DVisualization from '@/components/AI3DVisualization';
 const landingTeam = [
   {
     name: "Saumya Srivastava",
-    role: "Lead AI Engineer & Full-Stack Architect",
+    role: "Founder & Lead AI / Full-Stack Architect",
     phone: "+91 9026348598",
     linkedin: "https://www.linkedin.com/in/saumsriv/?skipRedirect=true",
   },
   {
     name: "Priyanshu Mishra",
-    role: "Co-Founder & Product Architect",
+    role: "Backend Developer",
   },
   {
     name: "Rajneesh Kumar",
@@ -317,7 +317,7 @@ export default function Landing() {
           >
             <span className="inline-block px-4 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">Core Contributors</span>
             <h2 className="text-4xl font-bold mb-4">Meet the <span className="gradient-text">Jeevansh AI</span> Team</h2>
-            <p className="text-muted-foreground text-lg max-w-xl mx-auto">The developers and co-founders working to advance clinical radiograph scanning.</p>
+            <p className="text-muted-foreground text-lg max-w-xl mx-auto">The engineers and developers working to advance clinical radiograph scanning.</p>
           </motion.div>
 
           <div className="grid md:grid-cols-3 gap-8">

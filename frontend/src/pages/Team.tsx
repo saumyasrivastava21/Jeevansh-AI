@@ -16,13 +16,13 @@ const fadeUp = {
 const teamMembers = [
   {
     name: "Saumya Srivastava",
-    role: "Lead AI Engineer & Full-Stack Architect",
+    role: "Founder & Lead AI / Full-Stack Architect",
     phone: "+91 9026348598",
     linkedin: "https://www.linkedin.com/in/saumsriv/?skipRedirect=true",
   },
   {
     name: "Priyanshu Mishra",
-    role: "Co-Founder & Product Architect",
+    role: "Backend Developer",
   },
   {
     name: "Rajneesh Kumar",
@@ -62,7 +62,7 @@ export default function Team() {
           Meet the <span className="gradient-text">Jeevansh AI</span> Team
         </h1>
         <p className="text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-          The engineers, developers, and founders behind Jeevansh AI, working to revolutionize clinical decision support.
+          The engineers and developers behind Jeevansh AI, working to revolutionize clinical decision support.
         </p>
       </motion.div>
 
