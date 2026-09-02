@@ -9,6 +9,9 @@ const User = require("./models/UserModel");
 const Doctor = require("./models/DoctorModel");
 const Disease = require("./models/DiseaseModel");
 const Report = require("./models/ReportModel");
+const Appointment = require("./models/AppointmentModel");
+const Post = require("./models/PostModel");
+const Comment = require("./models/CommentModel");
 
 // ─── Mock Users ────────────────────────────────────────────────
 const mockUsers = [
@@ -715,6 +718,9 @@ const seedDatabase = async () => {
     await Doctor.deleteMany({});
     await Disease.deleteMany({});
     await Report.deleteMany({});
+    await Appointment.deleteMany({});
+    await Post.deleteMany({});
+    await Comment.deleteMany({});
     console.log("   Done.");
 
     // 1. Seed Users (passwords are auto-hashed by the pre-save hook)
@@ -736,6 +742,12 @@ const seedDatabase = async () => {
     });
     const createdDoctors = await Doctor.insertMany(doctorDocs);
     console.log(`   ✅ ${createdDoctors.length} doctors created`);
+
+    // Build doctor userId → doctor._id lookup
+    const doctorByUserId = {};
+    createdDoctors.forEach((doc) => {
+      doctorByUserId[doc.userId.toString()] = doc._id;
+    });
 
     // 3. Seed Diseases
     console.log("\n🦠 Seeding Diseases...");
@@ -772,14 +784,118 @@ const seedDatabase = async () => {
     const createdReports = await Report.insertMany(reportDocs);
     console.log(`   ✅ ${createdReports.length} reports created`);
 
+    // 5. Seed Appointments
+    console.log("\n📅 Seeding Appointments...");
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfter = new Date();
+    dayAfter.setDate(dayAfter.getDate() + 2);
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const mockAppointments = [
+      {
+        patientId: userByEmail["arjun@example.com"],
+        doctorId: doctorByUserId[userByEmail["neha.joshi@hospital.com"].toString()],
+        appointmentDate: tomorrow,
+        appointmentTime: "03:00 PM",
+        reason: "Follow-up consultation on chest X-ray findings and lingering cough",
+        symptoms: "Mild chest tightness, shortness of breath upon exertion",
+        status: "pending",
+      },
+      {
+        patientId: userByEmail["priya@example.com"],
+        doctorId: doctorByUserId[userByEmail["rajesh.verma@hospital.com"].toString()],
+        appointmentDate: dayAfter,
+        appointmentTime: "05:30 PM",
+        reason: "Pulmonary screening discussion",
+        symptoms: "Persistent dry cough for two weeks",
+        status: "confirmed",
+        doctorNotes: "Please bring recent spirometry and X-ray records.",
+      },
+      {
+        patientId: userByEmail["arjun@example.com"],
+        doctorId: doctorByUserId[userByEmail["anil.khanna@hospital.com"].toString()],
+        appointmentDate: yesterday,
+        appointmentTime: "04:00 PM",
+        reason: "Right knee pain consultation post sports injury",
+        symptoms: "Swelling and difficulty bending knee",
+        status: "completed",
+        doctorNotes: "Minor patellar strain diagnosed. Prescribed anti-inflammatory and physiotherapy.",
+      },
+    ];
+
+    const createdAppointments = await Appointment.insertMany(mockAppointments);
+    console.log(`   ✅ ${createdAppointments.length} appointments created`);
+
+    // 6. Seed Community Posts & Comments
+    console.log("\n💬 Seeding Community Forum...");
+    const post1 = await Post.create({
+      author: userByEmail["arjun@example.com"],
+      title: "Early detection of Pneumonia via Jeevansh AI saved my lungs!",
+      content: "Jeevansh AI flagged an abnormality in my chest X-ray that I'd been ignoring for weeks. Turns out it was early-stage pneumonia. Got on antibiotics immediately. This platform might have saved me from a major hospital stay! 🙏",
+      category: "Recovery & Support",
+      tags: ["SuccessStory", "Pneumonia", "EarlyDetection"],
+      likes: [userByEmail["priya@example.com"], userByEmail["neha.joshi@hospital.com"]],
+      commentCount: 2,
+    });
+
+    await Comment.create({
+      postId: post1._id,
+      author: userByEmail["neha.joshi@hospital.com"],
+      content: "So glad the AI caught it early! Early detection makes such a difference in clinical prognosis. 💙",
+    });
+
+    await Comment.create({
+      postId: post1._id,
+      author: userByEmail["priya@example.com"],
+      content: "Same thing happened to me! This platform is incredible.",
+    });
+
+    const post2 = await Post.create({
+      author: userByEmail["neha.joshi@hospital.com"],
+      title: "Radiologist Perspective: How AI bounding boxes help triage critical cases",
+      content: "As a radiologist, I was skeptical at first. But after using Jeevansh's AI models for 3 months, I'm genuinely impressed. It catches subtle findings I occasionally miss on first pass during high-volume shifts. The bounding box overlays are clinically meaningful.",
+      category: "Doctors & Professionals",
+      tags: ["Radiology", "AIinMedicine", "ClinicalReview"],
+      likes: [userByEmail["arjun@example.com"], userByEmail["rajesh.verma@hospital.com"]],
+      commentCount: 1,
+    });
+
+    await Comment.create({
+      postId: post2._id,
+      author: userByEmail["rajesh.verma@hospital.com"],
+      content: "Completely agree. The TB classification and fracture bounding boxes are remarkably accurate.",
+    });
+
+    const post3 = await Post.create({
+      author: userByEmail["ravi@example.com"],
+      title: "Question on AI confidence score vs Doctor physical examination",
+      content: "Question for the community: My X-ray showed 87% confidence for bone fracture but the doctor said it's just a severe sprain. Is this normal? Should I get a second opinion? The AI report said 'hairline fracture' specifically.",
+      category: "Medical Questions",
+      tags: ["Question", "Fracture", "Advice"],
+      likes: [userByEmail["arjun@example.com"]],
+      commentCount: 1,
+    });
+
+    await Comment.create({
+      postId: post3._id,
+      author: userByEmail["neha.joshi@hospital.com"],
+      content: "Hairline fractures can be subtle and difficult to spot in standard plain films. A follow-up oblique view or CT scan would be prudent. 87% confidence is significant.",
+    });
+
+    console.log(`   ✅ 3 posts and comments created`);
+
     // Summary
     console.log("\n" + "═".repeat(50));
     console.log("🎉 DATABASE SEEDED SUCCESSFULLY!");
     console.log("═".repeat(50));
-    console.log(`   Users:    ${createdUsers.length}`);
-    console.log(`   Doctors:  ${createdDoctors.length}`);
-    console.log(`   Diseases: ${createdDiseases.length}`);
-    console.log(`   Reports:  ${createdReports.length}`);
+    console.log(`   Users:        ${createdUsers.length}`);
+    console.log(`   Doctors:      ${createdDoctors.length}`);
+    console.log(`   Diseases:     ${createdDiseases.length}`);
+    console.log(`   Reports:      ${createdReports.length}`);
+    console.log(`   Appointments: ${createdAppointments.length}`);
+    console.log(`   Posts:        3`);
     console.log("\n📌 Demo Credentials (password: demo123):");
     console.log("   Patient: arjun@example.com");
     console.log("   Doctor:  neha.joshi@hospital.com");

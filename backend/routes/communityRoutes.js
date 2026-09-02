@@ -1,36 +1,29 @@
 const express = require("express");
 const router = express.Router();
-const { protect } = require("../middlewares/authMiddleware");
 const {
   getPosts,
+  getPostById,
   createPost,
+  updatePost,
   deletePost,
-  toggleLike,
+  toggleLikePost,
   getComments,
-  addComment,
-  getNotifications,
-  markNotificationsRead,
-  searchDoctors,
-  getOnlineDoctorsList,
+  createComment,
+  deleteComment,
 } = require("../controllers/communityController");
+const { protect } = require("../middlewares/authMiddleware");
 
-// All community routes require authentication
-router.use(protect);
+// Post Routes
+router.get("/posts", getPosts);
+router.post("/posts", protect, createPost);
+router.get("/posts/:id", getPostById);
+router.patch("/posts/:id", protect, updatePost);
+router.delete("/posts/:id", protect, deletePost);
+router.post("/posts/:id/like", protect, toggleLikePost);
 
-// Posts
-router.route("/posts").get(getPosts).post(createPost);
-router.route("/posts/:id").delete(deletePost);
-router.route("/posts/:id/like").post(toggleLike);
-
-// Comments
-router.route("/posts/:id/comments").get(getComments).post(addComment);
-
-// Notifications
-router.route("/notifications").get(getNotifications);
-router.route("/notifications/read").put(markNotificationsRead);
-
-// Doctor search & presence
-router.route("/doctors").get(searchDoctors);
-router.route("/doctors/online").get(getOnlineDoctorsList);
+// Comment Routes
+router.get("/posts/:id/comments", getComments);
+router.post("/posts/:id/comments", protect, createComment);
+router.delete("/comments/:commentId", protect, deleteComment);
 
 module.exports = router;

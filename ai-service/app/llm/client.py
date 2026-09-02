@@ -48,7 +48,7 @@ class NVIDIAClient:
             )
         except openai.NotFoundError as e:
             # Fallback model if 404 encountered (NVIDIA account does not have access to Lightning model)
-            fallback_model = "nvidia/nemotron-3-nano-30b-a3b"
+            fallback_model = "meta/llama-3.2-11b-vision-instruct"
             logger.warning(f"[NVIDIA] Configured model {self.model} returned 404. Trying fallback model {fallback_model}...")
             try:
                 res = self._execute_chat(

@@ -38,7 +38,7 @@ router.post("/message", protect, async (req, res, next) => {
 
     const conversationMessages = [systemMessage];
 
-    const NVIDIA_FALLBACK_MODEL = process.env.NVIDIA_FALLBACK_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+    const NVIDIA_FALLBACK_MODEL = process.env.NVIDIA_FALLBACK_MODEL || "meta/llama-3.2-11b-vision-instruct";
 
     // Append prior conversation history if provided (up to last 12 messages)
     if (Array.isArray(history)) {

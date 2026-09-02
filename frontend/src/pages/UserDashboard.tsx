@@ -16,10 +16,14 @@ import {
   ArrowRight,
   Shield,
   Download,
+  Stethoscope,
+  CalendarDays,
+  Plus,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/contexts/ToastContext";
 import { apiFetch } from "@/lib/api";
+import { appointmentApi, Appointment } from "@/lib/appointmentApi";
 import { downloadReportPdf } from "@/utils/pdf";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,28 +53,50 @@ const statusBadgeMap: Record<
   pending: { variant: "pending", label: "Pending" },
 };
 
+const appointmentStatusMap: Record<
+  string,
+  { variant: "success" | "pending" | "info" | "destructive"; label: string }
+> = {
+  confirmed: { variant: "success", label: "Confirmed" },
+  pending: { variant: "pending", label: "Pending" },
+  completed: { variant: "info", label: "Completed" },
+  cancelled: { variant: "destructive", label: "Cancelled" },
+  rejected: { variant: "destructive", label: "Rejected" },
+};
+
 export default function UserDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [reports, setReports] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch("/reports/myreports")
-      .then((res) => {
-        if (res.success) setReports(res.data || []);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    Promise.all([
+      apiFetch("/reports/myreports")
+        .then((res) => {
+          if (res.success) setReports(res.data || []);
+        })
+        .catch(console.error),
+      appointmentApi
+        .getMyAppointments()
+        .then((data) => setAppointments(data || []))
+        .catch(console.error),
+    ]).finally(() => setLoading(false));
   }, []);
 
   const recentReports = reports.slice(0, 4);
+  const upcomingAppointments = appointments
+    .filter((a) => a.status === "confirmed" || a.status === "pending")
+    .slice(0, 3);
 
   // Compute real metrics
   const totalScans = reports.length;
   const reportsGenerated = reports.filter((r) => r.reportStatus === "completed").length;
-  const recentFindings = reports.filter((r) => r.hasFinding).length;
+  const activeConsultations = appointments.filter(
+    (a) => a.status === "confirmed" || a.status === "pending"
+  ).length;
   const lastScanDate =
     reports.length > 0
       ? new Date(reports[0].createdAt).toLocaleDateString("en-IN", {
@@ -95,18 +121,18 @@ export default function UserDashboard() {
       bg: "bg-emerald-500/10",
     },
     {
-      label: "Recent Findings",
-      value: recentFindings.toString(),
-      icon: AlertCircle,
-      color: "text-red-500",
-      bg: "bg-red-500/10",
+      label: "Active Consultations",
+      value: activeConsultations.toString(),
+      icon: Stethoscope,
+      color: "text-cyan-500",
+      bg: "bg-cyan-500/10",
     },
     {
       label: "Last Scan Upload",
       value: lastScanDate,
       icon: Clock,
-      color: "text-cyan-500",
-      bg: "bg-cyan-500/10",
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
     },
   ];
 
@@ -125,13 +151,13 @@ export default function UserDashboard() {
         <div className="relative z-10 space-y-4 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 border border-white/20 text-xs font-semibold">
             <Sparkles className="w-3.5 h-3.5 text-medical-cyan animate-pulse" />
-            AI-Powered Medical Scan Analysis
+            AI-Powered Medical Scan Analysis & Specialist Consultations
           </div>
           <h2 className="text-3xl md:text-4xl font-black tracking-tight leading-none">
             Welcome back, <span className="text-medical-cyan">{user?.name?.split(" ")[0]}</span> 👋
           </h2>
           <p className="text-white/80 text-sm md:text-base leading-relaxed">
-            Diagnose diagnostic images with deep learning model screening and get automatic interpretation reviews.
+            Diagnose diagnostic images with deep learning screening, track AI interpretation reports, and manage your verified doctor appointments.
           </p>
           <div className="flex flex-wrap gap-3 pt-2">
             <Button
@@ -145,8 +171,8 @@ export default function UserDashboard() {
               variant="outline"
               className="bg-white/5 text-white border-white/20 hover:bg-white/10 backdrop-blur-sm rounded-xl"
             >
-              <Link to="/chatbot">
-                <MessageSquare className="w-4 h-4 mr-2" /> Talk to AI Assistant
+              <Link to="/find-doctors">
+                <Stethoscope className="w-4 h-4 mr-2" /> Find a Specialist
               </Link>
             </Button>
           </div>
@@ -192,9 +218,9 @@ export default function UserDashboard() {
           custom={4}
           initial="hidden"
           animate="visible"
-          className="lg:col-span-2"
+          className="lg:col-span-2 space-y-6"
         >
-          <Card className="medical-card h-full border-primary/10">
+          <Card className="medical-card border-primary/10">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <Shield className="w-5 h-5 text-primary" />
@@ -211,6 +237,13 @@ export default function UserDashboard() {
                   bg: "bg-blue-500/10 text-blue-600 hover:bg-blue-500/20",
                 },
                 {
+                  label: "Doctor Appointments",
+                  desc: "View upcoming & book specialist",
+                  icon: CalendarDays,
+                  to: "/appointments",
+                  bg: "bg-cyan-500/10 text-cyan-600 hover:bg-cyan-500/20",
+                },
+                {
                   label: "My Reports History",
                   desc: "Filter and download past PDFs",
                   icon: FileText,
@@ -219,18 +252,18 @@ export default function UserDashboard() {
                 },
                 {
                   label: "Medical AI Assistant",
-                  desc: "Consult our RAG chatbot",
+                  desc: "Consult our clinical chatbot",
                   icon: MessageSquare,
                   to: "/chatbot",
-                  bg: "bg-cyan-500/10 text-cyan-600 hover:bg-cyan-500/20",
+                  bg: "bg-purple-500/10 text-purple-600 hover:bg-purple-500/20",
                 },
               ].map((act) => (
                 <Link key={act.label} to={act.to}>
                   <div
-                    className={`flex items-start gap-4 p-4 rounded-xl border border-border transition-all duration-200 cursor-pointer ${act.bg}`}
+                    className={`flex items-start gap-4 p-3.5 rounded-xl border border-border transition-all duration-200 cursor-pointer ${act.bg}`}
                   >
                     <div className="p-2 bg-white rounded-lg shadow-sm shrink-0">
-                      <act.icon className="w-5 h-5" />
+                      <act.icon className="w-4 h-4" />
                     </div>
                     <div>
                       <p className="text-sm font-bold flex items-center gap-1">
@@ -242,6 +275,73 @@ export default function UserDashboard() {
                   </div>
                 </Link>
               ))}
+            </CardContent>
+          </Card>
+
+          {/* Upcoming Consultations Widget */}
+          <Card className="medical-card border-primary/10">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarDays className="w-5 h-5 text-primary" />
+                Upcoming Consultations
+              </CardTitle>
+              <Button asChild variant="ghost" size="sm" className="text-xs">
+                <Link to="/appointments">View all</Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-2">
+              {loading ? (
+                <div className="py-6 text-center">
+                  <Loader2 className="w-5 h-5 text-primary animate-spin mx-auto mb-1" />
+                  <p className="text-xs text-muted-foreground">Loading appointments...</p>
+                </div>
+              ) : upcomingAppointments.length === 0 ? (
+                <div className="py-6 text-center space-y-2">
+                  <p className="text-xs text-muted-foreground">No upcoming appointments.</p>
+                  <Button asChild variant="outline" size="sm" className="rounded-xl text-xs gap-1">
+                    <Link to="/find-doctors">
+                      <Plus className="w-3 h-3" /> Book a Doctor
+                    </Link>
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {upcomingAppointments.map((app) => {
+                    const status =
+                      appointmentStatusMap[app.status] || appointmentStatusMap.pending;
+                    return (
+                      <div
+                        key={app._id}
+                        className="p-3 rounded-xl border border-border bg-muted/20 space-y-2 text-xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-bold text-foreground truncate">
+                              {app.doctorId?.userId?.name || "Specialist"}
+                            </p>
+                            <p className="text-primary text-[11px]">
+                              {app.doctorId?.specialty}
+                            </p>
+                          </div>
+                          <Badge variant={status.variant} className="text-[9px] uppercase px-1.5 py-0">
+                            {status.label}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground text-[11px]">
+                          <span>
+                            📅{" "}
+                            {new Date(app.appointmentDate).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                            })}
+                          </span>
+                          <span>⏰ {app.appointmentTime}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

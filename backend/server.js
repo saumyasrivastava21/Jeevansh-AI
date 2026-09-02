@@ -12,6 +12,7 @@ const doctorRoutes = require("./routes/doctorRoutes");
 const diseaseRoutes = require("./routes/diseaseRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
+const appointmentRoutes = require("./routes/appointmentRoutes");
 const communityRoutes = require("./routes/communityRoutes");
 
 // Middleware
@@ -64,6 +65,7 @@ app.use("/api/doctors", doctorRoutes);
 app.use("/api/diseases", diseaseRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/appointments", appointmentRoutes);
 app.use("/api/community", communityRoutes);
 
 app.get("/", (req, res) => {

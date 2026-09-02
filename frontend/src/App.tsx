@@ -23,6 +23,7 @@ import Tutorial from '@/pages/Tutorial';
 import Community from '@/pages/Community';
 import XRayUpload from '@/pages/XRayUpload';
 import MyReports from '@/pages/MyReports';
+import Appointments from '@/pages/Appointments';
 import Settings from '@/pages/Settings';
 import Team from '@/pages/Team';
 
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="/dashboard" element={<UserDashboard />} />
         <Route path="/dashboard/upload" element={<XRayUpload />} />
         <Route path="/dashboard/reports" element={<MyReports />} />
+        <Route path="/appointments" element={<Appointments />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/profile" element={<Settings />} />
         <Route path="/result" element={<XRayResult />} />

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, FileText, MessageSquare, Activity, Stethoscope,
   BookOpen, Users, Settings, LogOut, ChevronLeft, ChevronRight,
-  ShieldCheck, UserCheck, Upload,
+  ShieldCheck, UserCheck, Upload, Calendar,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -23,13 +23,14 @@ const navItems: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, to: '/dashboard' },
   { label: 'Upload X-Ray', icon: Upload, to: '/dashboard/upload', roles: ['patient'] },
   { label: 'My Reports', icon: FileText, to: '/dashboard/reports' },
+  { label: 'My Appointments', icon: Calendar, to: '/appointments', roles: ['patient'] },
   { label: 'AI Chatbot', icon: MessageSquare, to: '/chatbot' },
   { label: 'Diseases', icon: BookOpen, to: '/diseases' },
   { label: 'Find Doctors', icon: Stethoscope, to: '/find-doctors' },
   { label: 'Community', icon: Users, to: '/community' },
   { label: 'Tutorial', icon: Activity, to: '/tutorial' },
   // Doctor only
-  { label: 'Patient Reports', icon: UserCheck, to: '/doctor', roles: ['doctor'] },
+  { label: 'Doctor Portal', icon: UserCheck, to: '/doctor', roles: ['doctor'] },
   // Admin only
   { label: 'Admin Panel', icon: ShieldCheck, to: '/admin', roles: ['admin'] },
   { label: 'Manage Users', icon: Users, to: '/admin/users', roles: ['admin'] },

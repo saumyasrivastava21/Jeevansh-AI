@@ -7,7 +7,7 @@ const { protect } = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
-router.get("/", protect, getDoctors);
-router.get("/:id", protect, getDoctorById);
+router.get("/", getDoctors);
+router.get("/:id", getDoctorById);
 
 module.exports = router;

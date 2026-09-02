@@ -1,499 +1,491 @@
+const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
 const Post = require("../models/PostModel");
 const Comment = require("../models/CommentModel");
-const Like = require("../models/LikeModel");
-const Notification = require("../models/NotificationModel");
-const User = require("../models/UserModel");
-const Doctor = require("../models/DoctorModel");
 const { ApiResponse, ApiError } = require("../utils/apiResponse");
-const { getIO, getOnlineDoctors, isUserOnline } = require("../utils/socketManager");
 
-// ─── Helpers ───────────────────────────────────────────────
+const ALLOWED_CATEGORIES = [
+  "General Health",
+  "Medical Questions",
+  "AI & Healthcare",
+  "Recovery & Support",
+  "Doctors & Professionals",
+  "Jeevansh AI",
+];
 
-/**
- * Parse #tags from post content.
- * e.g. "My #Pneumonia experience #SuccessStory" → ["Pneumonia", "SuccessStory"]
- */
-function parseTags(content) {
-  const matches = content.match(/#(\w+)/g);
-  return matches ? matches.map((t) => t.slice(1)) : [];
-}
-
-/**
- * Parse @mentions from text.
- * Matches @Dr. Firstname Lastname or @Firstname Lastname (2-4 words after @)
- * Returns array of name strings.
- */
-function parseMentionNames(text) {
-  const regex = /@((?:Dr\.\s)?[A-Z][a-z]+(?:\s[A-Z][a-z]+){1,2})/g;
-  const names = [];
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    names.push(match[1].trim());
+// Helper to optionally extract user ID from token without failing if absent
+const getOptionalUserId = (req) => {
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith("Bearer")
+  ) {
+    try {
+      const token = req.headers.authorization.split(" ")[1];
+      const decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || "fallback_secret_key_123"
+      );
+      return decoded._id || decoded.id;
+    } catch (e) {
+      return null;
+    }
   }
-  return names;
-}
+  return null;
+};
 
-/**
- * Resolve mention names to user IDs. Skips self-mentions.
- */
-async function resolveMentions(mentionNames, authorId) {
-  if (!mentionNames.length) return [];
-  const users = await User.find({
-    name: { $in: mentionNames },
-    role: "doctor",
-  }).select("_id name");
-
-  // Filter out self-mentions
-  return users.filter((u) => u._id.toString() !== authorId.toString());
-}
-
-// ─── Posts ──────────────────────────────────────────────────
-
-/**
- * GET /api/community/posts
- * Paginated feed, newest first.
- * Query: ?page=1&limit=10
- */
+// @desc    Get all community posts with filtering & search
+// @route   GET /api/community/posts
+// @access  Public
 const getPosts = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+    const { category, search, tag, page = 1, limit = 20 } = req.query;
+    const currentUserId = req.user ? req.user._id : getOptionalUserId(req);
 
-    const posts = await Post.find()
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate("author", "name role avatar")
-      .lean();
+    const query = {};
 
-    // Check which posts the current user has liked
-    const postIds = posts.map((p) => p._id);
-    const userLikes = await Like.find({
-      post: { $in: postIds },
-      user: req.user._id,
-    }).select("post");
-    const likedSet = new Set(userLikes.map((l) => l.post.toString()));
+    if (category && category !== "All" && category !== "all") {
+      query.category = category;
+    }
 
-    // Attach doctor specialty if author is a doctor
-    const doctorAuthorIds = posts
-      .filter((p) => p.author.role === "doctor")
-      .map((p) => p.author._id);
-    const doctorProfiles = await Doctor.find({
-      userId: { $in: doctorAuthorIds },
-    }).select("userId specialty");
-    const specialtyMap = {};
-    doctorProfiles.forEach((d) => {
-      specialtyMap[d.userId.toString()] = d.specialty;
+    if (tag) {
+      query.tags = { $in: [tag] };
+    }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { content: { $regex: search, $options: "i" } },
+        { tags: { $in: [new RegExp(search, "i")] } },
+      ];
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [posts, total] = await Promise.all([
+      Post.find(query)
+        .populate("author", "name email avatar role")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      Post.countDocuments(query),
+    ]);
+
+    const formattedPosts = posts.map((post) => {
+      const isLiked = currentUserId
+        ? post.likes.some((id) => id.toString() === currentUserId.toString())
+        : false;
+      return {
+        _id: post._id,
+        author: post.author,
+        title: post.title,
+        content: post.content,
+        category: post.category,
+        tags: post.tags,
+        likesCount: post.likes.length,
+        isLiked,
+        commentCount: post.commentCount,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
+      };
     });
 
-    const enrichedPosts = posts.map((p) => ({
-      ...p,
-      liked: likedSet.has(p._id.toString()),
-      author: {
-        ...p.author,
-        specialty: specialtyMap[p.author._id.toString()] || null,
-      },
-    }));
-
-    const total = await Post.countDocuments();
-
-    res.status(200).json(
-      new ApiResponse(200, {
-        posts: enrichedPosts,
-        page,
-        totalPages: Math.ceil(total / limit),
-        total,
-      })
+    res.json(
+      new ApiResponse(
+        200,
+        {
+          posts: formattedPosts,
+          total,
+          page: parseInt(page),
+          pages: Math.ceil(total / parseInt(limit)),
+        },
+        "Community posts fetched successfully."
+      )
     );
-  } catch (err) {
-    next(err);
+  } catch (error) {
+    next(error);
   }
 };
 
-/**
- * POST /api/community/posts
- * Create a new post. Auto-parses #tags from content.
- */
-const createPost = async (req, res, next) => {
+// @desc    Get single post by ID
+// @route   GET /api/community/posts/:id
+// @access  Public
+const getPostById = async (req, res, next) => {
   try {
-    const { content } = req.body;
-    if (!content || !content.trim()) {
-      return next(new ApiError(400, "Post content is required"));
-    }
-    if (content.length > 1000) {
-      return next(new ApiError(400, "Post content cannot exceed 1000 characters"));
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return next(new ApiError(400, "Invalid Post ID."));
     }
 
-    const tags = parseTags(content);
+    const currentUserId = req.user ? req.user._id : getOptionalUserId(req);
+
+    const post = await Post.findById(req.params.id).populate(
+      "author",
+      "name email avatar role"
+    );
+
+    if (!post) {
+      return next(new ApiError(404, "Post not found."));
+    }
+
+    const isLiked = currentUserId
+      ? post.likes.some((id) => id.toString() === currentUserId.toString())
+      : false;
+
+    res.json(
+      new ApiResponse(
+        200,
+        {
+          _id: post._id,
+          author: post.author,
+          title: post.title,
+          content: post.content,
+          category: post.category,
+          tags: post.tags,
+          likesCount: post.likes.length,
+          isLiked,
+          commentCount: post.commentCount,
+          createdAt: post.createdAt,
+          updatedAt: post.updatedAt,
+        },
+        "Post retrieved successfully."
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create a new community post
+// @route   POST /api/community/posts
+// @access  Private
+const createPost = async (req, res, next) => {
+  try {
+    const { title, content, category, tags } = req.body;
+
+    if (!title || !content) {
+      return next(new ApiError(400, "Title and content are required."));
+    }
+
+    const trimmedTitle = title.trim();
+    const trimmedContent = content.trim();
+
+    if (trimmedTitle.length < 3 || trimmedTitle.length > 200) {
+      return next(new ApiError(400, "Title must be between 3 and 200 characters."));
+    }
+
+    if (trimmedContent.length < 5 || trimmedContent.length > 5000) {
+      return next(new ApiError(400, "Content must be between 5 and 5000 characters."));
+    }
+
+    const validatedCategory = ALLOWED_CATEGORIES.includes(category)
+      ? category
+      : "General Health";
+
+    let parsedTags = [];
+    if (Array.isArray(tags)) {
+      parsedTags = tags.map((t) => t.trim()).filter(Boolean);
+    } else if (typeof tags === "string") {
+      parsedTags = tags
+        .split(",")
+        .map((t) => t.trim().replace(/^#/, ""))
+        .filter(Boolean);
+    }
 
     const post = await Post.create({
       author: req.user._id,
-      content: content.trim(),
-      tags,
+      title: trimmedTitle,
+      content: trimmedContent,
+      category: validatedCategory,
+      tags: parsedTags,
+      likes: [],
+      commentCount: 0,
     });
 
-    const populated = await Post.findById(post._id)
-      .populate("author", "name role avatar")
-      .lean();
+    const populated = await Post.findById(post._id).populate(
+      "author",
+      "name email avatar role"
+    );
 
-    // Attach specialty if doctor
-    let specialty = null;
-    if (populated.author.role === "doctor") {
-      const doc = await Doctor.findOne({ userId: populated.author._id });
-      specialty = doc?.specialty || null;
-    }
-
-    const result = {
-      ...populated,
-      liked: false,
-      author: { ...populated.author, specialty },
-    };
-
-    // Handle @mentions in post content
-    const mentionNames = parseMentionNames(content);
-    const mentionedUsers = await resolveMentions(mentionNames, req.user._id);
-
-    for (const mentionedUser of mentionedUsers) {
-      const notification = await Notification.create({
-        recipient: mentionedUser._id,
-        sender: req.user._id,
-        type: "mention",
-        post: post._id,
-        message: `${req.user.name} mentioned you in a post`,
-      });
-
-      const populatedNotif = await Notification.findById(notification._id)
-        .populate("sender", "name avatar role")
-        .populate("post", "content")
-        .lean();
-
-      // Send real-time notification via user-specific room
-      const io = getIO();
-      if (io) {
-        io.to(`user:${mentionedUser._id.toString()}`).emit(
-          "notification:new",
-          populatedNotif
-        );
-      }
-    }
-
-    res.status(201).json(new ApiResponse(201, result, "Post created"));
-  } catch (err) {
-    next(err);
+    res.status(201).json(
+      new ApiResponse(
+        201,
+        {
+          _id: populated._id,
+          author: populated.author,
+          title: populated.title,
+          content: populated.content,
+          category: populated.category,
+          tags: populated.tags,
+          likesCount: 0,
+          isLiked: false,
+          commentCount: 0,
+          createdAt: populated.createdAt,
+          updatedAt: populated.updatedAt,
+        },
+        "Post created successfully."
+      )
+    );
+  } catch (error) {
+    next(error);
   }
 };
 
-/**
- * DELETE /api/community/posts/:id
- * Delete own post or admin can delete any.
- */
+// @desc    Update an existing post
+// @route   PATCH /api/community/posts/:id
+// @access  Private
+const updatePost = async (req, res, next) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return next(new ApiError(400, "Invalid Post ID."));
+    }
+
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return next(new ApiError(404, "Post not found."));
+    }
+
+    if (!post.author.equals(req.user._id) && req.user.role !== "admin") {
+      return next(new ApiError(403, "Not authorized to update this post."));
+    }
+
+    const { title, content, category, tags } = req.body;
+
+    if (title) post.title = title.trim();
+    if (content) post.content = content.trim();
+    if (category) {
+      post.category = ALLOWED_CATEGORIES.includes(category)
+        ? category
+        : post.category;
+    }
+    if (tags !== undefined) {
+      if (Array.isArray(tags)) {
+        post.tags = tags.map((t) => t.trim()).filter(Boolean);
+      } else if (typeof tags === "string") {
+        post.tags = tags
+          .split(",")
+          .map((t) => t.trim().replace(/^#/, ""))
+          .filter(Boolean);
+      }
+    }
+
+    await post.save();
+
+    const populated = await Post.findById(post._id).populate(
+      "author",
+      "name email avatar role"
+    );
+
+    const isLiked = post.likes.some(
+      (id) => id.toString() === req.user._id.toString()
+    );
+
+    res.json(
+      new ApiResponse(
+        200,
+        {
+          _id: populated._id,
+          author: populated.author,
+          title: populated.title,
+          content: populated.content,
+          category: populated.category,
+          tags: populated.tags,
+          likesCount: populated.likes.length,
+          isLiked,
+          commentCount: populated.commentCount,
+          createdAt: populated.createdAt,
+          updatedAt: populated.updatedAt,
+        },
+        "Post updated successfully."
+      )
+    );
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete a post and its comments
+// @route   DELETE /api/community/posts/:id
+// @access  Private
 const deletePost = async (req, res, next) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return next(new ApiError(400, "Invalid Post ID."));
+    }
+
     const post = await Post.findById(req.params.id);
-    if (!post) return next(new ApiError(404, "Post not found"));
-
-    if (
-      !post.author.equals(req.user._id) &&
-      req.user.role !== "admin"
-    ) {
-      return next(new ApiError(403, "Not authorized to delete this post"));
+    if (!post) {
+      return next(new ApiError(404, "Post not found."));
     }
 
-    // Clean up related data
-    await Comment.deleteMany({ post: post._id });
-    await Like.deleteMany({ post: post._id });
-    await Notification.deleteMany({ post: post._id });
-    await Post.findByIdAndDelete(post._id);
+    if (!post.author.equals(req.user._id) && req.user.role !== "admin") {
+      return next(new ApiError(403, "Not authorized to delete this post."));
+    }
 
-    res.status(200).json(new ApiResponse(200, null, "Post deleted"));
-  } catch (err) {
-    next(err);
+    await Promise.all([
+      Post.findByIdAndDelete(post._id),
+      Comment.deleteMany({ postId: post._id }),
+    ]);
+
+    res.json(new ApiResponse(200, null, "Post and associated comments deleted."));
+  } catch (error) {
+    next(error);
   }
 };
 
-// ─── Likes ─────────────────────────────────────────────────
-
-/**
- * POST /api/community/posts/:id/like
- * Toggle like/unlike. Uses atomic $inc to avoid race conditions.
- */
-const toggleLike = async (req, res, next) => {
+// @desc    Toggle like on a post
+// @route   POST /api/community/posts/:id/like
+// @access  Private
+const toggleLikePost = async (req, res, next) => {
   try {
-    const postId = req.params.id;
-    const userId = req.user._id;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return next(new ApiError(400, "Invalid Post ID."));
+    }
 
-    const existingLike = await Like.findOne({ post: postId, user: userId });
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return next(new ApiError(404, "Post not found."));
+    }
 
-    if (existingLike) {
-      // Unlike
-      await Like.findByIdAndDelete(existingLike._id);
-      await Post.findByIdAndUpdate(postId, { $inc: { likesCount: -1 } });
-      res.status(200).json(new ApiResponse(200, { liked: false }, "Unliked"));
+    const userIndex = post.likes.findIndex((id) =>
+      id.equals(req.user._id)
+    );
+
+    let isLiked = false;
+    if (userIndex === -1) {
+      post.likes.push(req.user._id);
+      isLiked = true;
     } else {
-      // Like
-      await Like.create({ post: postId, user: userId });
-      await Post.findByIdAndUpdate(postId, { $inc: { likesCount: 1 } });
-      res.status(200).json(new ApiResponse(200, { liked: true }, "Liked"));
+      post.likes.splice(userIndex, 1);
+      isLiked = false;
     }
-  } catch (err) {
-    // Handle duplicate key error gracefully (race condition safety net)
-    if (err.code === 11000) {
-      return res
-        .status(200)
-        .json(new ApiResponse(200, { liked: true }, "Already liked"));
-    }
-    next(err);
+
+    await post.save();
+
+    res.json(
+      new ApiResponse(
+        200,
+        {
+          likesCount: post.likes.length,
+          isLiked,
+        },
+        isLiked ? "Post liked." : "Post unliked."
+      )
+    );
+  } catch (error) {
+    next(error);
   }
 };
 
-// ─── Comments ──────────────────────────────────────────────
-
-/**
- * GET /api/community/posts/:id/comments
- * Flat comments for a post, oldest first.
- */
+// @desc    Get comments for a post
+// @route   GET /api/community/posts/:id/comments
+// @access  Public
 const getComments = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return next(new ApiError(400, "Invalid Post ID."));
+    }
 
-    const comments = await Comment.find({ post: req.params.id })
-      .sort({ createdAt: 1 })
-      .skip(skip)
-      .limit(limit)
-      .populate("author", "name role avatar")
-      .lean();
+    const comments = await Comment.find({ postId: req.params.id })
+      .populate("author", "name email avatar role")
+      .sort({ createdAt: 1 });
 
-    // Attach doctor specialty for doctor authors
-    const doctorAuthorIds = comments
-      .filter((c) => c.author.role === "doctor")
-      .map((c) => c.author._id);
-    const doctorProfiles = await Doctor.find({
-      userId: { $in: doctorAuthorIds },
-    }).select("userId specialty");
-    const specialtyMap = {};
-    doctorProfiles.forEach((d) => {
-      specialtyMap[d.userId.toString()] = d.specialty;
-    });
-
-    const enriched = comments.map((c) => ({
-      ...c,
-      author: {
-        ...c.author,
-        specialty: specialtyMap[c.author._id.toString()] || null,
-      },
-    }));
-
-    const total = await Comment.countDocuments({ post: req.params.id });
-
-    res.status(200).json(
-      new ApiResponse(200, {
-        comments: enriched,
-        page,
-        totalPages: Math.ceil(total / limit),
-        total,
-      })
-    );
-  } catch (err) {
-    next(err);
+    res.json(new ApiResponse(200, comments, "Comments fetched successfully."));
+  } catch (error) {
+    next(error);
   }
 };
 
-/**
- * POST /api/community/posts/:id/comments
- * Add a comment. Parses @mentions → creates notifications → broadcasts via socket.
- */
-const addComment = async (req, res, next) => {
+// @desc    Create a comment on a post
+// @route   POST /api/community/posts/:id/comments
+// @access  Private
+const createComment = async (req, res, next) => {
   try {
-    const { text } = req.body;
-    const postId = req.params.id;
-
-    if (!text || !text.trim()) {
-      return next(new ApiError(400, "Comment text is required"));
-    }
-    if (text.length > 500) {
-      return next(new ApiError(400, "Comment cannot exceed 500 characters"));
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return next(new ApiError(400, "Invalid Post ID."));
     }
 
-    const post = await Post.findById(postId);
-    if (!post) return next(new ApiError(404, "Post not found"));
+    const { content } = req.body;
+    const trimmedContent = (content || "").trim();
+    if (!trimmedContent) {
+      return next(new ApiError(400, "Comment text cannot be empty."));
+    }
+    if (trimmedContent.length > 2000) {
+      return next(new ApiError(400, "Comment must not exceed 2000 characters."));
+    }
 
-    // Parse mentions
-    const mentionNames = parseMentionNames(text);
-    const mentionedUsers = await resolveMentions(mentionNames, req.user._id);
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return next(new ApiError(404, "Post not found."));
+    }
 
     const comment = await Comment.create({
-      post: postId,
+      postId: post._id,
       author: req.user._id,
-      text: text.trim(),
-      mentions: mentionedUsers.map((u) => u._id),
+      content: trimmedContent,
     });
 
-    // Atomic increment comment count
-    await Post.findByIdAndUpdate(postId, { $inc: { commentsCount: 1 } });
+    // Increment comment count on the post
+    post.commentCount = (post.commentCount || 0) + 1;
+    await post.save();
 
-    const populated = await Comment.findById(comment._id)
-      .populate("author", "name role avatar")
-      .lean();
-
-    // Attach specialty
-    let specialty = null;
-    if (populated.author.role === "doctor") {
-      const doc = await Doctor.findOne({ userId: populated.author._id });
-      specialty = doc?.specialty || null;
-    }
-    populated.author.specialty = specialty;
-
-    const io = getIO();
-
-    // Broadcast new comment to everyone in the post room
-    if (io) {
-      io.to(`post:${postId}`).emit("comment:new", populated);
-    }
-
-    // Create notifications for mentioned users
-    for (const mentionedUser of mentionedUsers) {
-      const notification = await Notification.create({
-        recipient: mentionedUser._id,
-        sender: req.user._id,
-        type: "mention",
-        post: postId,
-        comment: comment._id,
-        message: `${req.user.name} mentioned you in a comment`,
-      });
-
-      const populatedNotif = await Notification.findById(notification._id)
-        .populate("sender", "name avatar role")
-        .populate("post", "content")
-        .lean();
-
-      if (io) {
-        io.to(`user:${mentionedUser._id.toString()}`).emit(
-          "notification:new",
-          populatedNotif
-        );
-      }
-    }
-
-    res.status(201).json(new ApiResponse(201, populated, "Comment added"));
-  } catch (err) {
-    next(err);
-  }
-};
-
-// ─── Notifications ─────────────────────────────────────────
-
-/**
- * GET /api/community/notifications
- * Get notifications for the current user (newest first).
- */
-const getNotifications = async (req, res, next) => {
-  try {
-    const notifications = await Notification.find({ recipient: req.user._id })
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .populate("sender", "name avatar role")
-      .populate("post", "content")
-      .lean();
-
-    const unreadCount = await Notification.countDocuments({
-      recipient: req.user._id,
-      read: false,
-    });
-
-    res
-      .status(200)
-      .json(new ApiResponse(200, { notifications, unreadCount }));
-  } catch (err) {
-    next(err);
-  }
-};
-
-/**
- * PUT /api/community/notifications/read
- * Mark notifications as read. Body: { ids: [...] } or empty to mark all.
- */
-const markNotificationsRead = async (req, res, next) => {
-  try {
-    const { ids } = req.body;
-    const filter = { recipient: req.user._id };
-    if (ids && ids.length) {
-      filter._id = { $in: ids };
-    }
-    await Notification.updateMany(filter, { $set: { read: true } });
-    res.status(200).json(new ApiResponse(200, null, "Notifications marked as read"));
-  } catch (err) {
-    next(err);
-  }
-};
-
-// ─── Doctor Search ─────────────────────────────────────────
-
-/**
- * GET /api/community/doctors?search=neha
- * Search all registered doctors. Returns online status per doctor.
- */
-const searchDoctors = async (req, res, next) => {
-  try {
-    const search = req.query.search || "";
-    const userFilter = { role: "doctor" };
-    if (search.trim()) {
-      userFilter.name = { $regex: search.trim(), $options: "i" };
-    }
-
-    const doctors = await User.find(userFilter)
-      .select("name avatar")
-      .limit(20)
-      .lean();
-
-    // Attach specialty and online status
-    const doctorIds = doctors.map((d) => d._id);
-    const profiles = await Doctor.find({ userId: { $in: doctorIds } }).select(
-      "userId specialty"
+    const populatedComment = await Comment.findById(comment._id).populate(
+      "author",
+      "name email avatar role"
     );
-    const specialtyMap = {};
-    profiles.forEach((p) => {
-      specialtyMap[p.userId.toString()] = p.specialty;
-    });
 
-    const result = doctors.map((d) => ({
-      _id: d._id,
-      name: d.name,
-      avatar: d.avatar,
-      specialty: specialtyMap[d._id.toString()] || "General",
-      online: isUserOnline(d._id),
-    }));
-
-    res.status(200).json(new ApiResponse(200, result));
-  } catch (err) {
-    next(err);
+    res.status(201).json(
+      new ApiResponse(201, populatedComment, "Comment added successfully.")
+    );
+  } catch (error) {
+    next(error);
   }
 };
 
-/**
- * GET /api/community/doctors/online
- * Get currently online doctors only.
- */
-const getOnlineDoctorsList = async (req, res, next) => {
+// @desc    Delete a comment
+// @route   DELETE /api/community/comments/:commentId
+// @access  Private
+const deleteComment = async (req, res, next) => {
   try {
-    const online = getOnlineDoctors();
-    res.status(200).json(new ApiResponse(200, online));
-  } catch (err) {
-    next(err);
+    if (!mongoose.Types.ObjectId.isValid(req.params.commentId)) {
+      return next(new ApiError(400, "Invalid Comment ID."));
+    }
+
+    const comment = await Comment.findById(req.params.commentId);
+    if (!comment) {
+      return next(new ApiError(404, "Comment not found."));
+    }
+
+    const post = await Post.findById(comment.postId);
+
+    // Authorization: comment author, post author, or admin
+    const isCommentAuthor = comment.author.equals(req.user._id);
+    const isPostAuthor = post && post.author.equals(req.user._id);
+    const isAdmin = req.user.role === "admin";
+
+    if (!isCommentAuthor && !isPostAuthor && !isAdmin) {
+      return next(new ApiError(403, "Not authorized to delete this comment."));
+    }
+
+    await Comment.findByIdAndDelete(comment._id);
+
+    if (post) {
+      post.commentCount = Math.max(0, (post.commentCount || 1) - 1);
+      await post.save();
+    }
+
+    res.json(new ApiResponse(200, null, "Comment deleted successfully."));
+  } catch (error) {
+    next(error);
   }
 };
 
 module.exports = {
   getPosts,
+  getPostById,
   createPost,
+  updatePost,
   deletePost,
-  toggleLike,
+  toggleLikePost,
   getComments,
-  addComment,
-  getNotifications,
-  markNotificationsRead,
-  searchDoctors,
-  getOnlineDoctorsList,
+  createComment,
+  deleteComment,
 };
