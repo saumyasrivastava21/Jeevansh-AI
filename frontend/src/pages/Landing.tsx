@@ -22,7 +22,7 @@ const landingTeam = [
   },
   {
     name: "Rajneesh Kumar",
-    role: "Core AI Developer & System Integrator",
+    role: "UI/UX Designer",
   },
 ];
 
