@@ -2,7 +2,7 @@
 
 # 🩺 Jeevansh AI
 
-### Next-Generation AI-Powered Medical Imaging & Diagnostic Platform
+### Next-Generation AI-Powered Medical Diagnostics, Clinical Workflows & Teleconsultation Platform
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -13,7 +13,7 @@
 [![NVIDIA](https://img.shields.io/badge/NVIDIA_Nemotron-LLM-76B900?style=for-the-badge&logo=nvidia&logoColor=white)](https://build.nvidia.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 
-*Clinical-grade AI inference · Agentic report generation · Real-time explainability*
+*Clinical-Grade AI Diagnostics · Explainable Vision Models · Agentic Reports · Doctor Consultations · Community Forum*
 
 </div>
 
@@ -21,128 +21,124 @@
 
 ## ✨ What is Jeevansh AI?
 
-**Jeevansh AI** is a full-stack, production-grade medical imaging AI application that combines **four verified deep learning models** with a **generative AI agentic report layer** powered by **NVIDIA Nemotron**. It assists patients and clinicians in understanding medical scans through real-time inference, visual explainability (Grad-CAM / bounding box overlays), auto-generated clinical reports, and an AI medical chatbot.
+**Jeevansh AI** is a production-grade full-stack healthcare platform that unifies **real-time Computer Vision deep learning**, **agentic LLM clinical report generation** powered by **NVIDIA Nemotron**, **conflict-free doctor appointment booking**, and a **peer-to-peer healthcare community**.
 
-> **This is not a demo.** All four models run actual trained checkpoints with verified confidence scores, bounding boxes, and class probabilities. The inference pipeline has been independently tested against direct Ultralytics/PyTorch model execution for bit-exact parity.
+Jeevansh AI bridges the gap between raw AI model inference and actual patient care — providing patients with instant explainable diagnostic screenings and giving certified medical specialists the tools to review scans, confirm appointments, and deliver clinical notes.
 
 ---
 
 ## 🏗️ System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         REACT FRONTEND                          │
-│              Vite + TypeScript · http://localhost:5173           │
-│   Dashboard · Upload · Results · AI Chatbot · Doctor Portal     │
-└────────────────────────┬────────────────────────────────────────┘
-                         │  REST API
-┌────────────────────────▼────────────────────────────────────────┐
-│                     EXPRESS BACKEND                             │
-│              Node.js 22 · http://localhost:5000                  │
-│  Auth (JWT) · Report CRUD · PDF Generation · Chatbot Proxy      │
-│  MongoDB/Mongoose · Background Report Generation Worker         │
-└────────┬────────────────────────────────────────┬───────────────┘
-         │ Multipart / Image Upload                │ NVIDIA OpenAI API
-┌────────▼─────────────────────┐        ┌─────────▼──────────────┐
-│   FASTAPI AI SERVICE         │        │   NVIDIA NEMOTRON LLM  │
-│   Python · http://localhost:8000│      │   nemotron-3.5-lightning│
-│   Model Inference Pipeline   │        │   Agentic Report Gen.  │
-│   Grad-CAM · YOLO Post-proc  │        │   Medical AI Chatbot   │
-└────────┬─────────────────────┘        └────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│                                  REACT FRONTEND                                  │
+│                       Vite + TypeScript · http://localhost:5173                  │
+│   Dashboard · AI Scan Upload · Explainable Results · Doctor Portal · Booking     │
+│   My Appointments · Community Forum · AI Chatbot · Disease Encyclopedia          │
+└────────────────────────────────────────┬─────────────────────────────────────────┘
+                                         │  REST API / JWT
+┌────────────────────────────────────────▼─────────────────────────────────────────┐
+│                                EXPRESS BACKEND                                   │
+│                       Node.js 22 · http://localhost:5000                         │
+│  Auth (JWT) · Appointment Booking & Conflict Guard · Community Posts & Comments  │
+│  Diagnostic Reports · PDF Generation · Chatbot Proxy · MongoDB / Mongoose        │
+└────────┬────────────────────────────────────────────────┬────────────────────────┘
+         │ Multipart / Image Stream                       │ OpenAI-Compatible API
+┌────────▼─────────────────────────┐            ┌─────────▼────────────────────────┐
+│       FASTAPI AI SERVICE         │            │       NVIDIA NEMOTRON LLM        │
+│    Python · http://localhost:8000│            │    nemotron-3.5-lightning-30b    │
+│    Model Inference Pipeline      │            │    Agentic Clinical Reports      │
+│    Grad-CAM Heatmaps · YOLO NMS  │            │    Safety Validation Guardrail   │
+└────────┬─────────────────────────┘            └──────────────────────────────────┘
          │
-┌────────▼──────────────────────────────┐
-│   PYTORCH / ULTRALYTICS CHECKPOINTS   │
-│   MobileNetV3-Large × 2               │
-│   YOLO11 × 2  (YOLO9m × 1)           │
-└───────────────────────────────────────┘
+┌────────▼─────────────────────────────────────────┐
+│        PYTORCH / ULTRALYTICS CHECKPOINTS         │
+│   MobileNetV3-Large (Skin Cancer, Pneumonia)     │
+│   YOLO11 (Bone Fracture) · YOLOv9m (Brain Tumor) │
+└──────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🤖 Verified Medical AI Models
+## 🤖 Verified Medical AI Vision Models
 
-All four models are loaded from actual trained checkpoints and run in memory on startup.
+All four models run in-memory on startup with full explainability and confidence scoring:
 
 ### 1. 🔬 Skin Cancer Classifier
 | Property | Value |
-|----------|-------|
-| **Task** | Multiclass Classification |
+|---|---|
+| **Task** | Multiclass Classification (7 Lesion Types) |
 | **Architecture** | `MobileNetV3-Large` |
-| **Classes** | Melanoma, Melanocytic Nevi, BCC, Actinic Keratosis, BKL, Dermatofibroma, Vascular Lesion (7 total) |
-| **Explainability** | **Grad-CAM** heatmap — visualises final conv layer `features[16][0]` |
-| **Preprocessing** | ImageNet normalization + strict channel alignment |
-| **Output** | Predicted class · Confidence · All class probabilities · Heatmap (Base64) |
+| **Classes** | Melanoma, Melanocytic Nevi, Basal Cell Carcinoma, Actinic Keratosis, Benign Keratosis, Dermatofibroma, Vascular Lesion |
+| **Explainability** | **Grad-CAM** Heatmap (`features[16][0]`) |
+| **Output** | Predicted class · Confidence · Probabilities array · Base64 Heatmap overlay |
 
 ### 2. 🫁 Pneumonia Classifier
 | Property | Value |
-|----------|-------|
-| **Task** | Binary Classification |
+|---|---|
+| **Task** | Binary Classification (`NORMAL` vs `PNEUMONIA`) |
 | **Architecture** | `MobileNetV3-Large` |
-| **Classes** | `NORMAL` vs `PNEUMONIA` |
-| **Explainability** | **Grad-CAM** heatmap — final conv layer `features[16][0]` |
-| **Preprocessing** | Channel-aligned, ImageNet normalised |
-| **Output** | Predicted class · Confidence · Class probabilities · Heatmap (Base64) |
+| **Explainability** | **Grad-CAM** Heatmap visualizer |
+| **Output** | Classification label · Confidence score · Probability distribution |
 
 ### 3. 🧠 Brain Tumor Detector
 | Property | Value |
-|----------|-------|
-| **Task** | Object Detection |
+|---|---|
+| **Task** | Object Detection & Localization |
 | **Architecture** | `YOLOv9m` |
 | **Classes** | `brain_tumor` |
 | **Inference Params** | `imgsz=640`, `conf=0.25`, `iou=0.45` |
-| **Explainability** | Detection overlay with bounding boxes |
-| **Output** | Detections · Confidence per box · Pixel bounding box coordinates · Overlay image |
+| **Output** | Detection bounding boxes · Confidence per box · Overlay visualization |
 
 ### 4. 🦴 Bone Fracture Detector
 | Property | Value |
-|----------|-------|
-| **Task** | Object Detection |
+|---|---|
+| **Task** | Object Detection & Localization |
 | **Architecture** | `YOLO11` |
 | **Classes** | `fracture` |
-| **Inference Params** | `imgsz=1024`, `conf=0.25`, `iou=0.45` |
-| **Explainability** | Detection overlay with bounding boxes |
-| **Special Note** | OpenCV BGR channel alignment for bit-exact parity with direct Ultralytics inference |
-| **Output** | Detections · Confidence per box · Pixel bounding box coordinates · Overlay image |
+| **Inference Params** | `imgsz=1024`, `conf=0.25`, `iou=0.45` (Strict BGR Channel Alignment) |
+| **Output** | Precise fracture bounding boxes · Confidence scores · Detection overlay |
 
 ---
 
 ## 🧬 Agentic AI Medical Report Generation
 
-After inference completes, Jeevansh AI runs an **asynchronous agentic pipeline** to generate a full clinical report:
+After vision inference completes, Jeevansh AI runs an asynchronous, multi-agent report pipeline:
 
-```
-ML Inference Result (verified)
-        ↓
-Express saves report with status: "generating"  ←── Immediate response to frontend
-        ↓  (background worker)
-FastAPI Report Agent
-        ↓
-NVIDIA Nemotron (nemotron-3.5-lightning-30b-a3b)
-        ↓
-Safety Validator (checks for hallucinations, missing fields, unsafe content)
-        ↓
-MongoDB: status → "completed" | "failed" | "failed_validation"
-        ↓
-React polls every 2s → renders AI report sections progressively
-        ↓
-PDF Download (PDFKit — ML results + full AI report)
-```
-
-**Key design decisions:**
-- ML results are **always shown immediately** — never blocked by LLM latency
-- Report generation is **fully non-blocking** — UI shows inference results in < 2 seconds
-- If NVIDIA is overloaded or fails, **raw ML predictions are always preserved**
-- Polling times out at 120 seconds with Refresh / Retry actions
+1. **Immediate Inference Response**: ML predictions and heatmaps display to the patient within < 2 seconds.
+2. **Background Report Agent**: Asynchronously queries **NVIDIA Nemotron-3.5-Lightning-30B**.
+3. **Safety Validator**: Validates report structure, checks for clinical safety, and prevents medical hallucinations.
+4. **Persistent Storage**: Structured report is saved directly to MongoDB.
+5. **Clinical PDF Export**: Generates downloadable PDF reports with visual scan overlays and structured findings using PDFKit.
 
 ---
 
-## 💬 AI Medical Chatbot
+## 📅 Doctor Appointment Booking System
 
-The built-in chatbot is powered by **NVIDIA Nemotron** (not a mock). It:
-- Maintains full **conversation history** across a session
-- Answers questions about scan results, conditions, and treatment options
-- Runs **server-side only** — the API key is never exposed to the browser
-- Shows clear error messages if the LLM is temporarily unavailable
+A conflict-free patient ↔ doctor consultation scheduling system:
+
+- **Server-Side Double Booking Prevention**: Real-time slot conflict detection returns `HTTP 409` on conflicting slots.
+- **Same-Day Slot Validation**: Prevents patients from booking time slots that have already passed for "Today".
+- **Strict State Machine Lifecycle**:
+  $$\text{Pending} \longrightarrow \text{Confirmed} \longrightarrow \text{Completed}$$
+  $$(\text{Alternative: Pending} \longrightarrow \text{Cancelled / Rejected})$$
+- **Doctor Portal**:
+  - Filter consultations by *All*, *Pending*, *Confirmed*, *Today*, *Completed*, or *Rejected*.
+  - 1-click **Confirm** and **Reject** workflows.
+  - **Mark Completed** modal to record verified clinical diagnosis notes and prescriptions.
+- **Patient Dashboard**: Tabbed appointment tracker with direct cancellation flow and doctor details.
+
+---
+
+## 💬 Healthcare Community Forum
+
+A persistent peer-to-peer discussion hub for clinical knowledge sharing and recovery support:
+
+- **MongoDB Backed**: All discussions, comments, and likes are persisted in MongoDB collections.
+- **Atomic Likes System**: Likes array with unique user ObjectIds prevents duplicate counts.
+- **Comment Threads & Synchronized Counters**: Normalized `Comment` schema with cascading deletion when parent posts are removed.
+- **Role Badges**: Highlights verified **Doctor** 🩺, **Admin** 🛡️, and **Patient** 👤 contributors.
+- **Categorized Feed & Search**: Filter by *General Health*, *Medical Questions*, *AI & Healthcare*, *Recovery & Support*, and *Doctors & Professionals*.
 
 ---
 
@@ -152,82 +148,82 @@ The built-in chatbot is powered by **NVIDIA Nemotron** (not a mock). It:
 Jeevansh-AI/
 ├── ai-service/                        # Python FastAPI Inference Microservice
 │   ├── app/
-│   │   ├── agents/
-│   │   │   ├── report_agent.py        # Agentic NVIDIA Nemotron report builder
-│   │   │   ├── evidence_agent.py      # Evidence extraction agent
-│   │   │   └── safety_validator.py    # Clinical safety validation layer
-│   │   ├── api/routes/
-│   │   │   ├── prediction.py          # /predict/{disease} endpoints
-│   │   │   ├── report.py              # /api/v1/reports/generate endpoint
-│   │   │   ├── health.py              # /health
-│   │   │   └── models.py              # /models metadata
-│   │   ├── core/config.py             # Settings (NVIDIA, model paths)
-│   │   ├── llm/
-│   │   │   ├── client.py              # NVIDIA OpenAI-compatible client
-│   │   │   └── prompts.py             # Medical system & user prompts
-│   │   ├── schemas/                   # Pydantic request/response schemas
-│   │   ├── services/
-│   │   │   ├── inference_service.py   # Core model inference pipeline
-│   │   │   └── model_registry.py      # Singleton model loader
-│   │   └── utils/gradcam.py           # Grad-CAM visualisation
-│   ├── tests/                         # 24 pytest tests (23 passing, 1 skipped)
+│   │   ├── agents/                    # Report Agent & Safety Validator
+│   │   ├── api/routes/                # /predict and /api/v1/reports/generate
+│   │   ├── core/config.py             # Settings & model paths
+│   │   ├── llm/                       # NVIDIA Nemotron client & prompts
+│   │   ├── schemas/                   # Pydantic schemas
+│   │   ├── services/                  # Inference pipeline & model registry
+│   │   └── utils/gradcam.py           # Grad-CAM visualization
+│   ├── tests/                         # Pytest test suite
 │   └── requirements.txt
 │
 ├── backend/                           # Node.js + Express REST API
 │   ├── controllers/
-│   │   ├── reportController.js        # Report CRUD + async PDF download
-│   │   └── userController.js          # Auth, registration, profile
-│   ├── middlewares/
-│   │   ├── authMiddleware.js          # JWT protect + role-based authorize
-│   │   ├── uploadMiddleware.js        # Multer scan upload handler
-│   │   └── errorMiddleware.js         # Global error handler
+│   │   ├── appointmentController.js   # Appointment lifecycle & conflict checks
+│   │   ├── communityController.js     # Forum CRUD, likes, comments
+│   │   ├── reportController.js        # AI Report CRUD & PDF generation
+│   │   └── userController.js          # Authentication & user profile
 │   ├── models/
-│   │   ├── ReportModel.js             # Full report schema (ML + LLM fields)
-│   │   └── UserModel.js               # User schema with roles
+│   │   ├── AppointmentModel.js        # Appointment schema & compound indexes
+│   │   ├── CommentModel.js            # Normalized comment schema
+│   │   ├── PostModel.js               # Discussion post schema
+│   │   ├── DoctorModel.js             # Doctor specialty & profile schema
+│   │   ├── ReportModel.js             # Diagnostic report schema
+│   │   └── UserModel.js               # User role-based schema
 │   ├── routes/
-│   │   ├── reportRoutes.js            # /api/reports CRUD + download
-│   │   ├── chatbotRoutes.js           # /api/chatbot/message → NVIDIA
-│   │   └── userRoutes.js              # /api/users auth routes
-│   ├── services/
-│   │   ├── aiService.js               # FastAPI client wrapper
-│   │   ├── reportGenerationService.js # Background async LLM worker
-│   │   └── reportPdfService.js        # PDFKit clinical report generator
-│   ├── tests/test_report.js           # Backend integration tests
+│   │   ├── appointmentRoutes.js       # /api/appointments routes
+│   │   ├── communityRoutes.js         # /api/community routes
+│   │   ├── doctorRoutes.js            # /api/doctors routes
+│   │   ├── reportRoutes.js            # /api/reports routes
+│   │   ├── chatbotRoutes.js           # /api/chatbot routes
+│   │   └── userRoutes.js              # /api/users routes
+│   ├── services/                      # AI client, PDF generation, LLM worker
+│   ├── tests/
+│   │   ├── verify_features.js         # Database integration test suite
+│   │   └── verify_http_api.js         # Full HTTP REST API test suite
+│   ├── seedData.js                    # Idempotent demo database seeder
 │   └── server.js                      # Express app entry point
 │
 ├── frontend/                          # React 18 + TypeScript + Vite
 │   └── src/
-│       ├── components/ui/             # shadcn/ui component library
-│       ├── contexts/AuthContext.tsx   # Global auth state
+│       ├── components/                # UI component library & layout
+│       ├── contexts/                  # AuthContext, ToastContext
+│       ├── lib/
+│       │   ├── appointmentApi.ts      # Type-safe appointment API client
+│       │   ├── communityApi.ts        # Type-safe community API client
+│       │   └── api.ts                 # Base API fetch configuration
 │       ├── pages/
-│       │   ├── XRayResult.tsx         # Scan results + progressive report polling
-│       │   ├── UserDashboard.tsx      # Report history + analytics
-│       │   ├── Chatbot.tsx            # Real NVIDIA-powered chatbot UI
-│       │   ├── DiseaseKnowledge.tsx   # Disease encyclopedia
-│       │   ├── FindDoctors.tsx        # Doctor discovery
-│       │   └── Landing.tsx            # Public landing page
-│       └── index.css                  # Design system tokens (dark mode)
+│       │   ├── Appointments.tsx       # Patient appointment dashboard
+│       │   ├── Community.tsx          # Healthcare community forum
+│       │   ├── DoctorPortal.tsx       # Doctor appointments & scan reviews
+│       │   ├── FindDoctors.tsx        # Doctor directory & appointment booking
+│       │   ├── XRayUpload.tsx         # Scan upload & disease selector
+│       │   ├── XRayResult.tsx         # Diagnostic results & Grad-CAM viewer
+│       │   ├── UserDashboard.tsx      # Patient analytics & history
+│       │   └── Chatbot.tsx            # NVIDIA AI medical assistant
+│       └── index.css                  # Tailwind CSS design system tokens
 │
-├── models/                            # Model checkpoints (git-ignored)
-└── docker-compose.yml                 # Container orchestration
+├── models/                            # Model checkpoints (.pt, .pth)
+└── docker-compose.yml                 # Docker container orchestration
 ```
 
 ---
 
-## ⚙️ Setup & Local Development
+## ⚙️ Quick Start & Local Setup
 
 ### Prerequisites
 
 | Dependency | Version | Purpose |
-|------------|---------|---------|
-| Python | 3.10+ | FastAPI AI service |
-| Node.js | 18+ | Express backend + React frontend |
-| MongoDB | 6+ | Running on `localhost:27017` |
-| NVIDIA API Key | — | Nemotron LLM (get free at [build.nvidia.com](https://build.nvidia.com)) |
+|---|---|---|
+| **Python** | 3.10+ | FastAPI AI inference microservice |
+| **Node.js** | 18+ | Express backend & React frontend |
+| **MongoDB** | 6.0+ | Database running on `127.0.0.1:27017` |
+| **NVIDIA API Key** | — | Nemotron LLM (free at [build.nvidia.com](https://build.nvidia.com)) |
 
 ---
 
-### Step 1 — Clone & configure environment
+### Step 1 — Clone Repository & Configure Environment
 
 ```bash
 git clone https://github.com/saumyasrivastava21/Jeevansh-AI.git
@@ -246,48 +242,41 @@ NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 **`backend/.env`**
 ```env
 PORT=5000
-MONGO_URI=mongodb://localhost:27017/jeevansh
-JWT_SECRET=your_secret_key_here
-AI_SERVICE_URL=http://localhost:8000
+MONGO_URI=mongodb://127.0.0.1:27017/jeevansh
+JWT_SECRET=your_jwt_secret_key_here
+AI_SERVICE_URL=http://127.0.0.1:8000
 NODE_ENV=development
 NVIDIA_API_KEY=your_nvidia_api_key_here
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
 NVIDIA_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
 ```
 
-> ⚠️ **Model checkpoints are not included in the repository.** Place your `.pt` / `.pth` files in the `models/` directory and configure their paths in `ai-service/app/core/config.py`.
-
 ---
 
-### Step 2 — Start the FastAPI AI Service
+### Step 2 — Start the Python FastAPI AI Service
 
 ```bash
 cd ai-service
 pip install -r requirements.txt
-uvicorn app.main:app --port 8000 --host 0.0.0.0
+python -m uvicorn app.main:app --port 8000 --host 127.0.0.1
 ```
 
-Verify:
-- Health: `http://localhost:8000/health`
-- Loaded models: `http://localhost:8000/models`
-- API docs: `http://localhost:8000/docs`
+*Endpoints:*
+- Interactive Swagger Docs: `http://localhost:8000/docs`
+- Service Health: `http://localhost:8000/health`
 
 ---
 
-### Step 3 — Start the Express Backend
+### Step 3 — Start the Express Backend & Seed Database
 
 ```bash
 cd backend
 npm install
+node seedData.js   # Seed sample doctors, users, appointments & forum posts
 npm start
 ```
 
-Runs on `http://localhost:5000`. Connects to MongoDB and loads the chatbot route.
-
-Optional — seed demo data:
-```bash
-node seedData.js
-```
+*Backend runs on `http://localhost:5000`.*
 
 ---
 
@@ -299,99 +288,89 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`
-
-**Demo credentials (after seeding):**
-| Role | Email | Password |
-|------|-------|----------|
-| Patient | `arjun@example.com` | `demo123` |
-| Doctor | `rajesh@example.com` | `demo123` |
-| Admin | `admin@jeevansh.ai` | `demo123` |
+*Open `http://localhost:5173` in your browser.*
 
 ---
 
-## 🧪 Testing
+## 🔑 Demo Login Accounts
 
-### Python Tests (FastAPI + NVIDIA)
-```bash
-cd ai-service
-pytest
-```
-**Result:** 23 passed, 1 skipped across 8 test files covering the full report pipeline, NVIDIA client, safety validator, and prediction endpoints.
+| Role | Email | Password | Access Capabilities |
+|---|---|---|---|
+| **Patient** | `arjun@example.com` | `demo123` | AI Scan Upload, Book Consultations, Manage Appointments, Community Posts |
+| **Doctor** | `neha.joshi@hospital.com` | `demo123` | Confirm/Complete Appointments, Review Patient Scans, Add Clinical Notes |
+| **Admin** | `admin@jeevansh.ai` | `demo123` | Full Administrative Controls & System Metrics |
 
-### Backend Tests (Node.js + MongoDB + PDF)
+---
+
+## 🧪 Comprehensive Test Suites
+
+### 1. Database & Feature Verification
 ```bash
 cd backend
-node tests/test_report.js
+node tests/verify_features.js
 ```
-Validates MongoDB schema, report persistence, and PDF generation end-to-end.
+*Validates MongoDB connections, appointment creation, conflict prevention (409), doctor confirmation/completion, post persistence, and cascading comment deletion.*
 
-### Pipeline Parity Tests
+### 2. HTTP REST API End-to-End Suite
 ```bash
-# Verify fracture model output matches direct Ultralytics execution
-python tests/compare_fracture_pipeline.py
+cd backend
+node tests/verify_http_api.js
 ```
+*Executes full authentication, booking, security authorization (403), community likes toggle, and comment API flows.*
+
+### 3. AI Service & Safety Tests
+```bash
+cd ai-service
+python -m pytest tests/test_report_schema.py tests/test_report_safety.py tests/test_report_agent.py
+```
+*Validates report generation schemas, LLM agents, and safety validators.*
 
 ---
 
 ## 🌐 API Reference
 
-### Reports
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/reports` | Upload scan + run inference |
-| `GET` | `/api/reports/myreports` | Get authenticated patient's reports |
-| `GET` | `/api/reports/:id` | Get single report (polls for LLM status) |
-| `GET` | `/api/reports/:id/download` | Download clinical PDF report |
-| `POST` | `/api/reports/:id/regenerate` | Re-trigger NVIDIA report generation |
+### Appointments (`/api/appointments`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/appointments` | Patient | Book consultation with slot conflict guard |
+| `GET` | `/api/appointments/my` | Patient | Get authenticated patient's appointments |
+| `GET` | `/api/appointments/doctor` | Doctor | Get appointments assigned to logged-in doctor |
+| `GET` | `/api/appointments/:id` | Authenticated | Retrieve single appointment details |
+| `PATCH`| `/api/appointments/:id/cancel` | Patient/Doctor | Cancel scheduled consultation |
+| `PATCH`| `/api/appointments/:id/confirm`| Doctor | Confirm pending appointment |
+| `PATCH`| `/api/appointments/:id/reject` | Doctor | Reject appointment with clinical reason |
+| `PATCH`| `/api/appointments/:id/complete`| Doctor | Mark completed & add clinical notes |
 
-### Chatbot
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/chatbot/message` | Send message → NVIDIA Nemotron response |
+### Community Forum (`/api/community`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `GET` | `/api/community/posts` | Public | List posts with category and search filter |
+| `POST`| `/api/community/posts` | Authenticated | Publish new discussion post |
+| `GET` | `/api/community/posts/:id` | Public | Get single post details |
+| `PATCH`| `/api/community/posts/:id` | Author/Admin | Update post title, content, or tags |
+| `DELETE`|`/api/community/posts/:id`| Author/Admin | Delete post and cascade delete comments |
+| `POST`| `/api/community/posts/:id/like`| Authenticated | Toggle atomic like on post |
+| `GET` | `/api/community/posts/:id/comments` | Public | Fetch comments for a post |
+| `POST`| `/api/community/posts/:id/comments` | Authenticated | Add comment to post thread |
+| `DELETE`|`/api/community/comments/:commentId`| Author/Admin | Delete comment and decrement counter |
 
-### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/users/login` | Authenticate + receive JWT |
-| `POST` | `/api/users/create` | Register new user |
-| `GET` | `/api/users/profile` | Get authenticated user profile |
-
----
-
-## 📋 Key Features
-
-- ✅ **4 real medical AI models** — MobileNetV3-Large (×2) + YOLO11 (×2)
-- ✅ **Grad-CAM heatmaps** for classification models (Skin Cancer, Pneumonia)
-- ✅ **Bounding box detection overlays** for YOLO models (Brain Tumor, Bone Fracture)
-- ✅ **Asynchronous AI report generation** — ML results shown instantly, LLM runs in background
-- ✅ **Clinical safety validation** on every AI-generated report
-- ✅ **PDF report download** — PDFKit, includes both ML results and AI narrative
-- ✅ **Real NVIDIA Nemotron chatbot** — full conversation history, server-side API key
-- ✅ **JWT authentication** with patient / doctor / admin role-based access control
-- ✅ **Progressive polling UI** with timeout and retry on report generation
-- ✅ **Dark mode first** design with glassmorphism, micro-animations, and Grad-CAM heatmap toggle
-- ✅ **24 automated tests** across FastAPI + Node.js layers
+### Diagnostic Reports (`/api/reports`)
+| Method | Endpoint | Access | Description |
+|---|---|---|---|
+| `POST` | `/api/reports` | Authenticated | Upload scan image & trigger AI inference |
+| `GET` | `/api/reports/myreports` | Authenticated | Get patient's diagnostic scan history |
+| `GET` | `/api/reports/:id` | Authenticated | Get report with polling status |
+| `GET` | `/api/reports/:id/download` | Authenticated | Download clinical PDF report |
+| `POST` | `/api/reports/:id/regenerate` | Authenticated | Re-trigger NVIDIA Nemotron report |
 
 ---
 
-## 🔐 Security Notes
+## 🔒 Security & Privacy
 
-- All NVIDIA API keys are stored in **server-side environment variables only** — never sent to or logged in the browser
-- JWT tokens use RS256-compatible secret signing with per-role authorization guards
-- Patient data is access-controlled: patients can only view and download their own reports
-- Uploaded scan images are stored locally in `backend/public/uploads/` (not in MongoDB)
-
----
-
-## 🛣️ Roadmap
-
-- [ ] DICOM file format support
-- [ ] Doctor review and annotation workflow
-- [ ] Multi-scan comparative analysis
-- [ ] Mobile app (React Native)
-- [ ] Federated learning for privacy-preserving model improvement
-- [ ] HL7 FHIR integration for EHR interoperability
+- **Server-Side Authorization**: Identity and roles are derived directly from signed JWT tokens (`req.user._id`), never trusting client-supplied IDs.
+- **Protected Environment Credentials**: NVIDIA API keys and database secrets reside strictly in server-side `.env` files.
+- **Data Isolation**: Patients are restricted to viewing and managing only their own scans and appointments.
+- **Medical Safety Validation**: Clinical LLM responses pass through a dedicated validation filter to prevent unsafe recommendations.
 
 ---
 
@@ -403,8 +382,8 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 <div align="center">
 
-Built with ❤️ · Powered by PyTorch, NVIDIA Nemotron, FastAPI, React, and MongoDB
+Built with ❤️ · Powered by PyTorch, NVIDIA Nemotron, FastAPI, Express.js, React, and MongoDB
 
-*Not a substitute for professional medical advice. Always consult a qualified healthcare professional.*
+*Disclaimer: Jeevansh AI is designed to assist clinical workflows and diagnostic education. Always consult a certified healthcare professional for definitive medical advice.*
 
 </div>
